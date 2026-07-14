@@ -82,6 +82,12 @@ async function startServer() {
       const localFilePath = req.file.path;
       const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
+      
+      // Build absolute local URL fallback so it works seamlessly on external domains like Vercel
+      const protocol = req.secure || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+      const host = req.headers["x-forwarded-host"] || req.get("host");
+      const serverOrigin = `${protocol}://${host}`;
+      const fileUrlLocal = `${serverOrigin}/uploads/${req.file.filename}`;
 
       if (firebaseStorage) {
         console.log(`Mengunggah ${originalName} ke Firebase Storage dari server...`);
@@ -91,30 +97,48 @@ async function startServer() {
         const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
         const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
         
-        // Unggah ke Firebase Storage
-        await uploadBytes(storageRef, fileBuffer, { contentType: mimeType });
-        const downloadUrl = await getDownloadURL(storageRef);
-        console.log("Berhasil mengunggah ke Firebase Storage:", downloadUrl);
-
-        // Hapus file lokal sementara untuk hemat ruang disk
         try {
-          fs.unlinkSync(localFilePath);
-        } catch (unlinkErr) {
-          console.warn("Gagal menghapus file sementara:", unlinkErr);
-        }
+          // Promise-based timeout of 3.5 seconds
+          const uploadPromise = uploadBytes(storageRef, fileBuffer, { contentType: mimeType })
+            .then(async () => {
+              return await getDownloadURL(storageRef);
+            });
+            
+          const timeoutPromise = new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout mengunggah ke Firebase Storage (3.5s)")), 3500)
+          );
 
-        return res.json({
-          success: true,
-          fileUrl: downloadUrl,
-          fileName: originalName,
-          storage: "firebase"
-        });
+          const downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          console.log("Berhasil mengunggah ke Firebase Storage:", downloadUrl);
+
+          // Hapus file lokal sementara untuk hemat ruang disk
+          try {
+            fs.unlinkSync(localFilePath);
+          } catch (unlinkErr) {
+            console.warn("Gagal menghapus file sementara:", unlinkErr);
+          }
+
+          return res.json({
+            success: true,
+            fileUrl: downloadUrl,
+            fileName: originalName,
+            storage: "firebase"
+          });
+        } catch (storageErr: any) {
+          console.warn("Gagal/Timeout mengunggah ke Firebase Storage di server, menggunakan penyimpanan lokal:", storageErr);
+          // Fallback to local file URL
+          return res.json({
+            success: true,
+            fileUrl: fileUrlLocal,
+            fileName: originalName,
+            storage: "local"
+          });
+        }
       } else {
         console.warn("Firebase Storage tidak terkonfigurasi, beralih ke lokal.");
-        const fileUrl = `/uploads/${req.file.filename}`;
         return res.json({ 
           success: true, 
-          fileUrl, 
+          fileUrl: fileUrlLocal, 
           fileName: originalName,
           storage: "local"
         });

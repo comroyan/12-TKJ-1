@@ -1,22 +1,19 @@
-const CACHE_NAME = "classhub-v2";
+const CACHE_NAME = "classhub-v3";
+
+// We do not cache index.html or application JS/CSS files to avoid stale asset hash errors (blank screen bug)
 const ASSETS_TO_CACHE = [
-  "/",
-  "/index.html",
-  "/manifest.json",
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
 ];
 
-// Install Event
 self.addEventListener("install", (e) => {
-  self.skipWaiting(); // Force active service worker to be replaced immediately
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
     })
   );
 });
 
-// Activate Event
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
@@ -28,43 +25,40 @@ self.addEventListener("activate", (e) => {
         })
       );
     }).then(() => {
-      return self.clients.claim(); // Claim control of all clients immediately
+      return self.clients.claim();
     })
   );
 });
 
-// Fetch Event (Network-first for HTML pages to prevent stale Vite hashes, Cache-first for other listed static assets)
+// Pass-through fetch handler ensuring PWA installability without risking blank screen bugs
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // Network-First for main routing pages (/, /index.html) to prevent stale hash mismatch in production
-  if (url.pathname === "/" || url.pathname === "/index.html") {
+  // Skip non-GET requests, API requests, and local assets to prevent chunk load errors and CORS issues
+  if (
+    e.request.method !== "GET" || 
+    url.pathname.includes("/api/") || 
+    url.hostname.includes("run.app") || 
+    url.hostname.includes("firestore.googleapis.com")
+  ) {
+    return;
+  }
+
+  // Only handle cache for fonts
+  if (url.hostname.includes("fonts.googleapis.com") || url.hostname.includes("fonts.gstatic.com")) {
     e.respondWith(
-      fetch(e.request)
-        .then((response) => {
-          const responseClone = response.clone();
+      caches.match(e.request).then((cachedResponse) => {
+        return cachedResponse || fetch(e.request).then((networkResponse) => {
+          const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(e.request, responseClone);
           });
-          return response;
-        })
-        .catch(() => {
-          return caches.match(e.request);
-        })
-    );
-  } else if (ASSETS_TO_CACHE.includes(url.pathname)) {
-    // Cache-First for secondary static assets (like web fonts / manifest)
-    e.respondWith(
-      caches.match(e.request).then((cachedResponse) => {
-        return cachedResponse || fetch(e.request);
+          return networkResponse;
+        }).catch(() => fetch(e.request));
       })
     );
   } else {
-    // Default network-first for pages and dynamic requests
-    e.respondWith(
-      fetch(e.request).catch(() => {
-        return caches.match(e.request);
-      })
-    );
+    // Always fetch directly from network to avoid caching old Vite bundle hashes
+    e.respondWith(fetch(e.request));
   }
 });

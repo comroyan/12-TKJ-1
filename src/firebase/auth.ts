@@ -31,6 +31,18 @@ export interface UserSession {
 
 // Check if setup admin has been completed
 export async function isSetupCompleted(): Promise<boolean> {
+  const currentOrigin = window.location.origin;
+  const isLocalOrSandbox = 
+    currentOrigin.includes("localhost") || 
+    currentOrigin.includes("127.0.0.1") || 
+    currentOrigin.includes("ais-dev") ||
+    currentOrigin.includes("run.app");
+
+  if (!isLocalOrSandbox) {
+    // In production setups on external domains like Vercel, setup is always completed.
+    return true;
+  }
+
   // Check local storage first to prevent database roundtrips and avoid issues when Firestore is slow, rate-limited, or temporarily offline
   if (localStorage.getItem("classhub_setup_completed") === "true") {
     return true;
@@ -52,13 +64,6 @@ export async function isSetupCompleted(): Promise<boolean> {
     return completed;
   } catch (e) {
     console.error("Gagal memeriksa status setup dari Firestore, beralih ke cache lokal:", e);
-    // If we've ever successfully loaded the app before, or on timeout, default to true to let the app load the login screen.
-    const isCached = localStorage.getItem("classhub_setup_completed") === "true";
-    if (!isCached) {
-      // In production setups on external domains like Vercel, setup is already completed.
-      // Defensively assume setup is done so users are not incorrectly redirected to the Setup Screen.
-      return true;
-    }
     return true;
   }
 }

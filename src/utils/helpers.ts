@@ -299,6 +299,12 @@ export async function uploadFileToServer(
       const formData = new FormData();
       formData.append("file", file);
 
+      // Add a client-side timeout of 5.5 seconds to prevent hanging on slow network or scaled-down backend
+      const uploadTimeout = setTimeout(() => {
+        xhr.abort();
+        reject(new Error("Timeout mengunggah ke server (5.5s)"));
+      }, 5500);
+
       xhr.open("POST", getApiUrl("/api/upload"));
 
       if (onProgress) {
@@ -311,6 +317,7 @@ export async function uploadFileToServer(
       }
 
       xhr.onload = () => {
+        clearTimeout(uploadTimeout);
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
@@ -329,6 +336,7 @@ export async function uploadFileToServer(
       };
 
       xhr.onerror = () => {
+        clearTimeout(uploadTimeout);
         reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
       };
 
