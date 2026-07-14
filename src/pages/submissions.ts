@@ -22,6 +22,117 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
 
   let activeTabSubmissions = "review";
 
+  function attachViewFileBtnListeners() {
+    document.querySelectorAll(".view-file-btn").forEach((btn: any) => {
+      if (btn.classList.contains("listener-attached")) return;
+      btn.classList.add("listener-attached");
+
+      btn.addEventListener("click", (e: Event) => {
+        e.preventDefault();
+        const fileUrl = btn.getAttribute("data-url") || "";
+        const fileName = btn.getAttribute("data-name") || "Berkas Tugas";
+        
+        const isBase64 = fileUrl.startsWith("data:");
+        const isImage = isBase64 
+          ? fileUrl.startsWith("data:image/") 
+          : /\.(png|jpe?g|gif|svg|webp)$/i.test(fileUrl);
+        const isPdf = isBase64 
+          ? fileUrl.startsWith("data:application/pdf") 
+          : /\.pdf$/i.test(fileUrl);
+
+        let previewHtml = "";
+        if (isImage) {
+          previewHtml = `
+            <div class="flex flex-col items-center gap-3">
+              <div class="max-h-[350px] overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-2 flex items-center justify-center w-full">
+                <img src="${fileUrl}" class="max-w-full h-auto rounded-lg" style="object-fit: contain;" alt="Pratinjau Gambar" referrerPolicy="no-referrer" />
+              </div>
+              <p class="text-[11px] text-slate-500 font-mono text-center">Pratinjau Gambar • Format: ${isBase64 ? 'Base64' : 'Cloud Storage'}</p>
+            </div>
+          `;
+        } else if (isPdf) {
+          previewHtml = `
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-full h-[180px] rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+                <div class="p-3 bg-rose-500/10 text-rose-400 rounded-full mb-2">
+                  <i data-lucide="file-text" class="w-10 h-10"></i>
+                </div>
+                <p class="text-xs font-bold text-slate-200 truncate w-full px-4">${fileName}</p>
+                <p class="text-[10px] text-slate-500 mt-1">Dokumen PDF (Gunakan tombol unduh di bawah)</p>
+              </div>
+            </div>
+          `;
+        } else {
+          const ext = fileName.split(".").pop()?.toUpperCase() || "Berkas";
+          previewHtml = `
+            <div class="flex flex-col items-center gap-3">
+              <div class="w-full h-[180px] rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+                <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-full mb-2">
+                  <i data-lucide="file-archive" class="w-10 h-10"></i>
+                </div>
+                <p class="text-xs font-bold text-slate-200 truncate w-full px-4">${fileName}</p>
+                <p class="text-[10px] text-slate-500 mt-1">Berkas ${ext} (Gunakan tombol unduh di bawah)</p>
+              </div>
+            </div>
+          `;
+        }
+
+        Swal.fire({
+          title: "Pratinjau & Unduh Berkas",
+          background: "#0f172a",
+          color: "#f8fafc",
+          width: isImage ? "600px" : "450px",
+          html: `
+            <div class="space-y-4 text-left mt-4 font-sans">
+              <div class="flex items-start gap-3 p-3 bg-slate-900 border border-slate-850 rounded-2xl">
+                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">
+                  <i data-lucide="paperclip" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-xs font-semibold text-slate-200 truncate" title="${fileName}">${fileName}</p>
+                  <p class="text-[10px] text-slate-500 mt-0.5 font-mono truncate">Sumber: ${isBase64 ? 'Data URL (Luring/Fallback)' : 'Cloud Storage'}</p>
+                </div>
+              </div>
+              ${previewHtml}
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "Unduh Berkas",
+          cancelButtonText: "Tutup",
+          confirmButtonColor: "#06b6d4",
+          cancelButtonColor: "#334155",
+          didOpen: () => {
+            renderIcons();
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            try {
+              if (isBase64) {
+                const link = document.createElement("a");
+                link.href = fileUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              } else {
+                const link = document.createElement("a");
+                link.href = getApiUrl(fileUrl);
+                link.target = "_blank";
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }
+              toast.success("Mengeksekusi pengunduhan berkas...");
+            } catch (dlErr: any) {
+              toast.error("Gagal mengunduh: " + dlErr.message);
+            }
+          }
+        });
+      });
+    });
+  }
+
   async function loadAndRender() {
     try {
       const [allTasks, allSubmissions, mySubmissions, allStudents] = await Promise.all([
@@ -245,10 +356,10 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
                           <i data-lucide="file-text" class="text-slate-400 w-4 h-4 shrink-0"></i>
                           <span class="text-xs text-slate-300 font-mono truncate" title="${s.fileName}">${s.fileName}</span>
                         </div>
-                        <a href="${getApiUrl(s.fileUrl)}" target="_blank" class="p-1.5 bg-slate-950 hover:bg-cyan-500 hover:text-slate-950 border border-slate-800 text-slate-400 rounded-lg transition-colors flex items-center gap-1" title="Unduh Berkas">
-                          <i data-lucide="external-link" class="w-3 h-3"></i>
-                          <span class="text-[9px] font-bold">Link</span>
-                        </a>
+                        <button class="view-file-btn p-1.5 bg-slate-950 hover:bg-cyan-500 hover:text-slate-950 border border-slate-800 text-slate-400 rounded-lg transition-colors flex items-center gap-1 cursor-pointer" data-url="${s.fileUrl}" data-name="${s.fileName || 'Lihat Berkas'}" title="Pratinjau / Unduh Berkas">
+                          <i data-lucide="eye" class="w-3 h-3"></i>
+                          <span class="text-[9px] font-bold">Buka</span>
+                        </button>
                       </div>
 
                       <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono">
@@ -597,6 +708,8 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         }
       });
     });
+
+    attachViewFileBtnListeners();
   }
 
   // -------------------------------------------------------------------------
@@ -790,7 +903,9 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
                     ${s.fileName || 'Berkas Uji Coba'} <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono ml-1 shrink-0">Simulasi</span>
                   </button>
                 ` : `
-                  <a href="${getApiUrl(s.fileUrl)}" target="_blank" class="text-xs text-cyan-400 hover:underline truncate" title="Unduh Berkas">${s.fileName || 'Lihat Berkas'}</a>
+                  <button class="view-file-btn text-xs text-cyan-400 hover:underline truncate cursor-pointer text-left font-semibold" data-url="${s.fileUrl}" data-name="${s.fileName || 'Lihat Berkas'}" title="Pratinjau & Unduh Berkas">
+                    ${s.fileName || 'Lihat Berkas'}
+                  </button>
                 `}
               </div>
             </td>
@@ -817,6 +932,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       }).join("");
 
       renderIcons();
+      attachViewFileBtnListeners();
 
       // Attach simulated file click warnings
       document.querySelectorAll(".simulated-file-btn").forEach((btn: any) => {
