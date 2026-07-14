@@ -541,20 +541,49 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
           throw new Error("Berkas lampiran tidak ditemukan.");
         }
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+        let fileUrl = "";
+        
+        // Try direct browser-to-Catbox upload first to offload the server and bypass cold starts
+        try {
+          console.log("Mencoba unggah cloud langsung dari browser...");
+          const catboxForm = new FormData();
+          catboxForm.append("reqtype", "fileupload");
+          catboxForm.append("fileToUpload", selectedFile);
 
-        const uploadRes = await fetch(getApiUrl("/api/upload"), {
-          method: "POST",
-          body: formData,
-        });
+          const directRes = await fetch("https://catbox.moe/user/api.php", {
+            method: "POST",
+            body: catboxForm,
+          });
 
-        if (!uploadRes.ok) {
-          const errData = await uploadRes.json();
-          throw new Error(errData.error || "Gagal mengunggah berkas ke server.");
+          if (directRes.ok) {
+            const textResult = await directRes.text();
+            if (textResult && textResult.trim().startsWith("http")) {
+              fileUrl = textResult.trim();
+              console.log("Browser direct upload successful:", fileUrl);
+            }
+          }
+        } catch (directErr) {
+          console.warn("Direct upload gagal atau diblokir CORS, beralih ke server upload:", directErr);
         }
 
-        const uploadData = await uploadRes.json();
+        // Fallback to Express backend upload if direct upload didn't succeed
+        if (!fileUrl) {
+          const formData = new FormData();
+          formData.append("file", selectedFile);
+
+          const uploadRes = await fetch(getApiUrl("/api/upload"), {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json();
+            throw new Error(errData.error || "Gagal mengunggah berkas ke server.");
+          }
+
+          const uploadData = await uploadRes.json();
+          fileUrl = uploadData.fileUrl;
+        }
 
         // Fast-forward to 100% on success
         clearInterval(interval);
@@ -569,7 +598,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
           userName: userSession.name,
           absen: userSession.absen || 0,
           fileName: selectedFile.name,
-          fileUrl: uploadData.fileUrl, // Real relative path like /uploads/filename.ext
+          fileUrl: fileUrl, // URL link to file
           status: "Menunggu Pemeriksaan",
           feedback: "",
           taskType,

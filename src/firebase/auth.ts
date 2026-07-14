@@ -31,12 +31,22 @@ export interface UserSession {
 
 // Check if setup admin has been completed
 export async function isSetupCompleted(): Promise<boolean> {
+  // Check local storage first to prevent database roundtrips and avoid issues when Firestore is slow, rate-limited, or temporarily offline
+  if (localStorage.getItem("classhub_setup_completed") === "true") {
+    return true;
+  }
   try {
     const docRef = doc(db, "settings", "setup_status");
     const snap = await getDoc(docRef);
-    return snap.exists() && snap.data().completed === true;
+    const completed = snap.exists() && snap.data().completed === true;
+    if (completed) {
+      localStorage.setItem("classhub_setup_completed", "true");
+    }
+    return completed;
   } catch (e) {
-    return false;
+    console.error("Gagal memeriksa status setup dari Firestore, beralih ke cache lokal:", e);
+    // If we've ever successfully loaded the app before, assume setup is complete
+    return localStorage.getItem("classhub_setup_completed") === "true";
   }
 }
 
@@ -95,6 +105,7 @@ export async function runAdminSetup(name: string, username: string, pass: string
     setupDate: new Date().toISOString(),
     setupBy: uid
   });
+  localStorage.setItem("classhub_setup_completed", "true");
 
   await writeAuditLog("Setup Admin", `Super Admin Pertama (${adminData.name}) berhasil dikonfigurasi.`);
   return user;

@@ -30,35 +30,106 @@ const DEFAULT_TTL_MS = 20 * 1000;
 
 export function invalidateCache(prefix?: string) {
   if (prefix) {
+    // Invalidate Memory Cache
     Object.keys(MEMORY_CACHE).forEach(key => {
       if (key === prefix || key.startsWith(prefix + "_") || key.startsWith(prefix + "/")) {
         delete MEMORY_CACHE[key];
       }
     });
+    // Invalidate localStorage Cache
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("classhub_cache_")) {
+          const cacheKey = key.substring("classhub_cache_".length);
+          if (cacheKey === prefix || cacheKey.startsWith(prefix + "_") || cacheKey.startsWith(prefix + "/")) {
+            localStorage.removeItem(key);
+            i--; // Adjust index since we removed an item
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal membersihkan cache lokal:", e);
+    }
   } else {
+    // Invalidate All Memory Cache
     Object.keys(MEMORY_CACHE).forEach(key => delete MEMORY_CACHE[key]);
+    // Invalidate All localStorage Cache
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("classhub_cache_")) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn("Gagal membersihkan semua cache lokal:", e);
+    }
   }
 }
 
 async function fetchWithCache(key: string, fetchFn: () => Promise<any>, ttl: number = DEFAULT_TTL_MS): Promise<any> {
   const now = Date.now();
+  
+  // 1. Try memory cache first
   const cached = MEMORY_CACHE[key];
   if (cached && (now - cached.timestamp < ttl)) {
     return cached.data;
   }
+
+  // 2. Try localStorage cache next (if not found in memory, or if memory cache expired)
+  let localCachedData: any = null;
+  let localTimestamp = 0;
+  try {
+    const localStr = localStorage.getItem(`classhub_cache_${key}`);
+    if (localStr) {
+      const parsed = JSON.parse(localStr);
+      localCachedData = parsed.data;
+      localTimestamp = parsed.timestamp;
+      
+      // If the localStorage cache is still fresh and memory cache didn't exist or was stale, populate memory cache and return
+      if (now - localTimestamp < ttl) {
+        MEMORY_CACHE[key] = {
+          data: localCachedData,
+          timestamp: localTimestamp
+        };
+        return localCachedData;
+      }
+    }
+  } catch (e) {
+    console.warn("Gagal membaca cache lokal untuk key:", key, e);
+  }
+
   try {
     const freshData = await fetchFn();
+    // Save to memory cache
     MEMORY_CACHE[key] = {
       data: freshData,
       timestamp: now
     };
+    // Save to localStorage cache for cross-session persistent loading
+    try {
+      localStorage.setItem(`classhub_cache_${key}`, JSON.stringify({
+        data: freshData,
+        timestamp: now
+      }));
+    } catch (e) {
+      console.warn("Gagal menulis cache lokal untuk key:", key, e);
+    }
     return freshData;
   } catch (error) {
     console.error(`Cache fetch failed for key: ${key}`, error);
-    // If we have a stale cached version, return it even if it's expired! This prevents offline crash/lag.
+    
+    // 3. Fallback to expired memory or localStorage cache to prevent crashing/spinning under connection failure
     if (cached) {
-      console.log(`Returning stale cached version for key: ${key}`);
+      console.log(`Returning stale memory cache version for key: ${key}`);
       return cached.data;
+    }
+    if (localCachedData) {
+      console.log(`Returning stale localStorage cache version for key: ${key}`);
+      return localCachedData;
     }
     throw error;
   }

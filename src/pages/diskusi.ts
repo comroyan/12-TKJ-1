@@ -19,6 +19,18 @@ import Swal from "sweetalert2";
 // Elevated to file/module level to prevent duplicate snapshot memory leak on route changes
 let globalUnsubscribeMessages: (() => void) | null = null;
 
+export function cleanupDiskusiListener() {
+  if (globalUnsubscribeMessages) {
+    try {
+      globalUnsubscribeMessages();
+      console.log("Cleaned up diskusi snapshot listener successfully.");
+    } catch (e) {
+      console.warn("Gagal membersihkan listener diskusi:", e);
+    }
+    globalUnsubscribeMessages = null;
+  }
+}
+
 export function renderDiskusi(container: HTMLElement, userSession: any) {
   // Unsubscribe from any previous instance's listener to prevent stacking multiple active Firestore streams
   if (globalUnsubscribeMessages) {

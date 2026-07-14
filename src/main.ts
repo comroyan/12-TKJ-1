@@ -31,7 +31,7 @@ import { renderLearningCenter } from "./pages/learningCenter";
 import { renderTKJHub } from "./pages/tkjHub";
 import { renderMiniGames } from "./pages/miniGames";
 import { renderLinkBelajar } from "./pages/linkBelajar";
-import { renderDiskusi } from "./pages/diskusi";
+import { renderDiskusi, cleanupDiskusiListener } from "./pages/diskusi";
 import { renderSubmissions } from "./pages/submissions";
 
 // App Core State
@@ -575,6 +575,10 @@ async function renderMainLayout() {
   const sidebarPanel = document.getElementById("sidebarPanel") as HTMLElement;
 
   function routeToPage(page: string) {
+    // Clean up active real-time diskusichat listener to prevent lag, active read cost and memory leak
+    if (page !== "diskusi") {
+      cleanupDiskusiListener();
+    }
     currentActivePage = page;
     navItems.forEach((btn: any) => {
       const isSelected = btn.dataset.page === page;
