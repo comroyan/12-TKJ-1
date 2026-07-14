@@ -1,4 +1,4 @@
-const CACHE_NAME = "classhub-v1";
+const CACHE_NAME = "classhub-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -8,6 +8,7 @@ const ASSETS_TO_CACHE = [
 
 // Install Event
 self.addEventListener("install", (e) => {
+  self.skipWaiting(); // Force active service worker to be replaced immediately
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
@@ -26,23 +27,40 @@ self.addEventListener("activate", (e) => {
           }
         })
       );
+    }).then(() => {
+      return self.clients.claim(); // Claim control of all clients immediately
     })
   );
 });
 
-// Fetch Event (Network-first falling back to cache for API/firebase, cache-first for static fonts/assets)
+// Fetch Event (Network-first for HTML pages to prevent stale Vite hashes, Cache-first for other listed static assets)
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // For static local assets, prefer cache
-  if (ASSETS_TO_CACHE.includes(url.pathname)) {
+  // Network-First for main routing pages (/, /index.html) to prevent stale hash mismatch in production
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseClone);
+          });
+          return response;
+        })
+        .catch(() => {
+          return caches.match(e.request);
+        })
+    );
+  } else if (ASSETS_TO_CACHE.includes(url.pathname)) {
+    // Cache-First for secondary static assets (like web fonts / manifest)
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
         return cachedResponse || fetch(e.request);
       })
     );
   } else {
-    // Default network-first
+    // Default network-first for pages and dynamic requests
     e.respondWith(
       fetch(e.request).catch(() => {
         return caches.match(e.request);
