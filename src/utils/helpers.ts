@@ -269,3 +269,21 @@ export function isOddWeek(dateInput: Date = new Date()): boolean {
   return weekNo % 2 !== 0;
 }
 
+// Get correct API / resource URL when running statically on external hosts like Vercel
+export function getApiUrl(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const currentOrigin = window.location.origin;
+  if (
+    currentOrigin.includes("vercel.app") ||
+    currentOrigin.includes("github.io") ||
+    (!currentOrigin.includes("run.app") && !currentOrigin.includes("localhost") && !currentOrigin.includes("127.0.0.1"))
+  ) {
+    const backendBase = "https://ais-pre-i66yyju5cwidah224f6iqz-705381100555.asia-southeast1.run.app";
+    return `${backendBase}${path.startsWith("/") ? path : "/" + path}`;
+  }
+  return path;
+}
+

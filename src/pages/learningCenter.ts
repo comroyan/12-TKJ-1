@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, auth, storage } from "../firebase/config";
-import { renderIcons, toast, formatShortDate, confirmDialog } from "../utils/helpers";
+import { renderIcons, toast, formatShortDate, confirmDialog, getApiUrl } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 // Topics for Materials & Bank Soal
@@ -1111,7 +1111,7 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
         aiChatWindow.scrollTop = aiChatWindow.scrollHeight;
 
         try {
-          const res = await fetch("/api/ai", {
+          const res = await fetch(getApiUrl("/api/ai"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

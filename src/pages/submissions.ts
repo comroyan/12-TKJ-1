@@ -1,5 +1,5 @@
 import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask } from "../firebase/db";
-import { renderIcons, formatDate, toast, confirmDialog } from "../utils/helpers";
+import { renderIcons, formatDate, toast, confirmDialog, getApiUrl } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderSubmissions(container: HTMLElement, userSession: any) {
@@ -243,7 +243,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
                           <i data-lucide="file-text" class="text-slate-400 w-4 h-4 shrink-0"></i>
                           <span class="text-xs text-slate-300 font-mono truncate" title="${s.fileName}">${s.fileName}</span>
                         </div>
-                        <a href="${s.fileUrl}" target="_blank" class="p-1.5 bg-slate-950 hover:bg-cyan-500 hover:text-slate-950 border border-slate-800 text-slate-400 rounded-lg transition-colors flex items-center gap-1" title="Unduh Berkas">
+                        <a href="${getApiUrl(s.fileUrl)}" target="_blank" class="p-1.5 bg-slate-950 hover:bg-cyan-500 hover:text-slate-950 border border-slate-800 text-slate-400 rounded-lg transition-colors flex items-center gap-1" title="Unduh Berkas">
                           <i data-lucide="external-link" class="w-3 h-3"></i>
                           <span class="text-[9px] font-bold">Link</span>
                         </a>
@@ -544,7 +544,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         const formData = new FormData();
         formData.append("file", selectedFile);
 
-        const uploadRes = await fetch("/api/upload", {
+        const uploadRes = await fetch(getApiUrl("/api/upload"), {
           method: "POST",
           body: formData,
         });
@@ -803,7 +803,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
                     ${s.fileName || 'Berkas Uji Coba'} <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono ml-1 shrink-0">Simulasi</span>
                   </button>
                 ` : `
-                  <a href="${s.fileUrl}" target="_blank" class="text-xs text-cyan-400 hover:underline truncate" title="Unduh Berkas">${s.fileName || 'Lihat Berkas'}</a>
+                  <a href="${getApiUrl(s.fileUrl)}" target="_blank" class="text-xs text-cyan-400 hover:underline truncate" title="Unduh Berkas">${s.fileName || 'Lihat Berkas'}</a>
                 `}
               </div>
             </td>
