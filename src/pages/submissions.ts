@@ -1,7 +1,7 @@
 import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask } from "../firebase/db";
 import { renderIcons, formatDate, toast, confirmDialog, getApiUrl } from "../utils/helpers";
 import Swal from "sweetalert2";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase/config";
 
 export async function renderSubmissions(container: HTMLElement, userSession: any) {
@@ -524,101 +524,46 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       submitSubBtn.disabled = true;
       uploadProgressContainer.classList.remove("hidden");
 
-      let progress = 0;
       progressBar.style.width = "0%";
       progressPercentage.textContent = "0%";
-
-      // Simulated smooth progress animation up to 90%
-      const interval = setInterval(() => {
-        if (progress < 90) {
-          progress += Math.floor(Math.random() * 15) + 5;
-          if (progress > 90) progress = 90;
-          progressBar.style.width = progress + "%";
-          progressPercentage.textContent = progress + "%";
-        }
-      }, 150);
 
       try {
         if (!selectedFile) {
           throw new Error("Berkas lampiran tidak ditemukan.");
         }
 
-        let fileUrl = "";
-        
-        // 1. Try Firebase Storage directly (most reliable, bypasses Express cold-starts and CORS limits)
-        try {
-          console.log("Mencoba unggah langsung ke Firebase Storage...");
-          const safeName = `${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-          const storageRef = ref(storage, `submissions/${userSession.uid}/${safeName}`);
-          const snapshot = await uploadBytes(storageRef, selectedFile);
-          fileUrl = await getDownloadURL(snapshot.ref);
-          console.log("Direct Firebase Storage upload successful:", fileUrl);
-        } catch (firebaseErr) {
-          console.warn("Direct Firebase Storage upload failed, trying Express API fallback:", firebaseErr);
-        }
+        console.log("Mencoba unggah langsung ke Firebase Storage...");
+        const safeName = `${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+        const storageRef = ref(storage, `submissions/${userSession.uid}/${safeName}`);
 
-        // 2. Fallback to Express backend upload if direct Firebase Storage failed
-        if (!fileUrl) {
-          try {
-            console.log("Mencoba unggah ke server Express...");
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-
-            const uploadRes = await fetch(getApiUrl("/api/upload"), {
-              method: "POST",
-              body: formData,
-            });
-
-            if (uploadRes.ok) {
-              const uploadData = await uploadRes.json();
-              fileUrl = uploadData.fileUrl;
-              console.log("Express API upload successful:", fileUrl);
-            } else {
-              const errData = await uploadRes.json().catch(() => ({}));
-              console.warn("Express API upload failed:", errData.error || "Unknown error");
-            }
-          } catch (expressErr) {
-            console.warn("Express API upload fetch failed:", expressErr);
-          }
-        }
-
-        // 3. Emergency last-resort: Try direct browser-to-Catbox upload
-        if (!fileUrl) {
-          try {
-            console.log("Mencoba unggah darurat ke Catbox...");
-            const catboxForm = new FormData();
-            catboxForm.append("reqtype", "fileupload");
-            catboxForm.append("fileToUpload", selectedFile);
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-            const directRes = await fetch("https://catbox.moe/user/api.php", {
-              method: "POST",
-              body: catboxForm,
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (directRes.ok) {
-              const textResult = await directRes.text();
-              if (textResult && textResult.trim().startsWith("http")) {
-                fileUrl = textResult.trim();
-                console.log("Catbox direct upload successful:", fileUrl);
+        const fileUrl = await new Promise<string>((resolve, reject) => {
+          const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+          uploadTask.on('state_changed',
+            (snapshot) => {
+              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              progressBar.style.width = progress + "%";
+              progressPercentage.textContent = progress + "%";
+            },
+            (error) => {
+              console.error("Firebase Storage Upload Error:", error);
+              reject(new Error("Gagal mengunggah berkas ke Firebase Storage: " + error.message));
+            },
+            async () => {
+              try {
+                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve(downloadUrl);
+              } catch (err: any) {
+                reject(new Error("Gagal mendapatkan link unduhan berkas: " + err.message));
               }
             }
-          } catch (catboxErr) {
-            console.warn("Catbox emergency upload failed or timed out:", catboxErr);
-          }
-        }
+          );
+        });
 
-        // 4. Ensure we have a valid URL
+        // Ensure we have a valid URL
         if (!fileUrl) {
-          throw new Error("Semua metode unggah gagal. Silakan coba lagi atau gunakan ukuran berkas yang lebih kecil.");
+          throw new Error("Tautan berkas kosong atau tidak valid.");
         }
 
-        // Fast-forward to 100% on success
-        clearInterval(interval);
         progressBar.style.width = "100%";
         progressPercentage.textContent = "100%";
 
@@ -648,7 +593,6 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         
         loadAndRender();
       } catch (err: any) {
-        clearInterval(interval);
         Swal.fire("Gagal Mengirim", err.message, "error");
         submitSubBtn.disabled = false;
         uploadProgressContainer.classList.add("hidden");

@@ -59,65 +59,14 @@ async function startServer() {
         return res.status(400).json({ error: "Tidak ada file yang diunggah" });
       }
       
-      // Default fallback path on the local server
-      let fileUrl = `/uploads/${req.file.filename}`;
-      let uploadedToCloud = false;
-
-      try {
-        console.log("Mencoba mengunggah ke Catbox Cloud...");
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const blob = new Blob([fileBuffer], { type: req.file.mimetype });
-        
-        const catboxForm = new FormData();
-        catboxForm.append("reqtype", "fileupload");
-        catboxForm.append("fileToUpload", blob, req.file.originalname);
-
-        // AbortController timeout of 6 seconds
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.warn("Catbox upload request timed out after 6 seconds, aborting...");
-        }, 6000);
-
-        const response = await fetch("https://catbox.moe/user/api.php", {
-          method: "POST",
-          body: catboxForm,
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const resultText = await response.text();
-          if (resultText && resultText.trim().startsWith("http")) {
-            fileUrl = resultText.trim();
-            uploadedToCloud = true;
-            console.log("Unggah Cloud Berhasil:", fileUrl);
-            
-            // Delete the local file to save disk space on stateless Cloud Run container
-            try {
-              fs.unlinkSync(req.file.path);
-            } catch (unlinkErr) {
-              console.warn("Gagal menghapus cache berkas lokal:", unlinkErr);
-            }
-          } else {
-            console.warn("Respon Catbox tidak valid:", resultText);
-          }
-        } else {
-          console.warn("Catbox menolak unggahan, status:", response.status);
-        }
-      } catch (cloudErr: any) {
-        if (cloudErr.name === "AbortError") {
-          console.error("Gagal mengunggah ke Cloud: Batas waktu habis (Timeout). Beralih ke penyimpanan lokal.");
-        } else {
-          console.error("Gagal mengunggah ke Cloud, beralih ke penyimpanan lokal cadangan:", cloudErr);
-        }
-      }
+      // Local fallback path
+      const fileUrl = `/uploads/${req.file.filename}`;
 
       res.json({ 
         success: true, 
         fileUrl, 
         fileName: req.file.originalname,
-        storage: uploadedToCloud ? "cloud" : "local"
+        storage: "local"
       });
     } catch (error: any) {
       console.error("Upload Error:", error);

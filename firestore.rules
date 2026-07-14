@@ -92,13 +92,23 @@ service cloud.firestore {
     // Agenda Collection
     match /agenda/{agendaId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isWakil();
+      allow write: if isSuperAdmin() || isWakil() || isSekretaris() ||
+                    (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+                      getUserData().jabatan == 'Ketua Kelas' || 
+                      getUserData().jabatan == 'Guru' || 
+                      getUserData().jabatan == 'Wali Kelas'
+                    ));
     }
 
     // Tasks Collection
     match /tasks/{taskId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isWakil() || isSekretaris();
+      allow write: if isSuperAdmin() || isWakil() || isSekretaris() ||
+                    (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+                      getUserData().jabatan == 'Ketua Kelas' || 
+                      getUserData().jabatan == 'Guru' || 
+                      getUserData().jabatan == 'Wali Kelas'
+                    ));
     }
 
     // Polls (Voting) Collection
