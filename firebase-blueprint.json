@@ -1,0 +1,485 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and authentication mappings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "absen": { "type": "integer" },
+        "foto": { "type": "string" },
+        "email": { "type": "string" },
+        "hp": { "type": "string" },
+        "instagram": { "type": "string" },
+        "tempatPkl": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "bio": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Subject schedules for school days Monday to Friday",
+      "type": "object",
+      "properties": {
+        "day": { "type": "string" },
+        "subjects": { "type": "array" }
+      },
+      "required": ["day", "subjects"]
+    },
+    "Picket": {
+      "title": "Picket",
+      "description": "Cleaning duties schedule",
+      "type": "object",
+      "properties": {
+        "day": { "type": "string" },
+        "members": { "type": "array" }
+      },
+      "required": ["day", "members"]
+    },
+    "ClassFund": {
+      "title": "ClassFund",
+      "description": "Records of class cash in/out and student payments",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "evidenceUrl": { "type": "string" },
+        "status": { "type": "string" },
+        "description": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["amount", "type", "date"]
+    },
+    "EventFund": {
+      "title": "EventFund",
+      "description": "Event-specific financials separate from regular cash",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "eventName": { "type": "string" },
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "evidenceUrl": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["eventId", "eventName", "amount", "status", "date"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Class announcements and bulletins",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "priority": { "type": "string" }
+      },
+      "required": ["title", "content", "date", "priority"]
+    },
+    "Agenda": {
+      "title": "Agenda",
+      "description": "Calendar schedules and events",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "type": { "type": "string" }
+      },
+      "required": ["title", "date", "type"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Shared homework tasks with countdowns",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "teacher": { "type": "string" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "type": { "type": "string" },
+        "link": { "type": "string" },
+        "attachmentUrl": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["subject", "deadline", "priority", "status"]
+    },
+    "Poll": {
+      "title": "Poll",
+      "description": "Realtime classroom voting",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "options": { "type": "array" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["question", "options", "status", "createdAt"]
+    },
+    "Gallery": {
+      "title": "Gallery",
+      "description": "Photos of class moments",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "uploaderId": { "type": "string" },
+        "uploaderName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" }
+      },
+      "required": ["imageUrl", "date"]
+    },
+    "File": {
+      "title": "File",
+      "description": "Shared file downloads and resource links",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "uploadDate": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "uploaderId": { "type": "string" },
+        "uploaderName": { "type": "string" }
+      },
+      "required": ["name", "type", "fileUrl", "uploadDate"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "Class meeting notes and minutes",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "content": { "type": "string" },
+        "presenter": { "type": "string" },
+        "attendees": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "date", "content", "createdAt"]
+    },
+    "Inventory": {
+      "title": "Inventory",
+      "description": "Classroom equipment catalog and loan tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "description": { "type": "string" },
+        "borrowerId": { "type": "string" },
+        "borrowerName": { "type": "string" },
+        "borrowDate": { "type": "string" },
+        "returnDate": { "type": "string" }
+      },
+      "required": ["name", "status"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Important whatsapp / phone numbers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "roleDescription": { "type": "string" }
+      },
+      "required": ["name", "phone"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array" }
+      },
+      "required": ["title", "content", "type", "date"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "App configurations like logo, motto, etc.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "className": { "type": "string" },
+        "motto": { "type": "string" },
+        "theme": { "type": "string" }
+      },
+      "required": ["className"]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "System activity log for audits",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "string" }
+      },
+      "required": ["action", "timestamp"]
+    },
+    "StudyLink": {
+      "title": "StudyLink",
+      "description": "Links and references for studying",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "url": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "uploaderId": { "type": "string" },
+        "uploaderName": { "type": "string" }
+      },
+      "required": ["title", "url", "category"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Subject materials",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "type": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "uploaderId": { "type": "string" },
+        "uploaderName": { "type": "string" }
+      },
+      "required": ["title", "subject", "type", "url"]
+    },
+    "QuizScore": {
+      "title": "QuizScore",
+      "description": "Student quiz performance logs",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "subject": { "type": "string" },
+        "score": { "type": "number" },
+        "correct": { "type": "integer" },
+        "total": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "score", "timestamp"]
+    },
+    "StudyTarget": {
+      "title": "StudyTarget",
+      "description": "Student dynamic studying targets",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetMins": { "type": "integer" },
+        "progress": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "completed", "createdAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Saves/Bookmarks of study materials by user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "materialId": { "type": "string" }
+      },
+      "required": ["userId", "materialId"]
+    },
+    "GameData": {
+      "title": "GameData",
+      "description": "Student leveling and profile for mini-games",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "xp": { "type": "integer" },
+        "coins": { "type": "integer" },
+        "level": { "type": "integer" },
+        "badges": { "type": "array" },
+        "inventory": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "xp", "coins"]
+    },
+    "StickyNote": {
+      "title": "StickyNote",
+      "description": "Dynamic sticky notes on boards",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "color": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Messages sent in class discussion channels",
+      "type": "object",
+      "properties": {
+        "channelId": { "type": "string" },
+        "text": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userFoto": { "type": "string" },
+        "userRole": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "reactions": { "type": "object" },
+        "attachmentUrl": { "type": "string" }
+      },
+      "required": ["channelId", "text", "userId", "userName", "createdAt"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Student assignment file submissions",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "taskTitle": { "type": "string" },
+        "subject": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "absen": { "type": "integer" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "status": { "type": "string" },
+        "taskType": { "type": "string" },
+        "members": { "type": "array" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "feedback": { "type": "string" }
+      },
+      "required": ["taskId", "taskTitle", "subject", "userId", "userName", "fileUrl", "fileName", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "User account documents keyed by Auth UID"
+    },
+    "schedules": {
+      "schema": "Schedule",
+      "description": "Weekly lesson schedules"
+    },
+    "pickets": {
+      "schema": "Picket",
+      "description": "Weekly cleaning shifts"
+    },
+    "classFund": {
+      "schema": "ClassFund",
+      "description": "Class cash fund bookkeeping entries"
+    },
+    "eventFunds": {
+      "schema": "EventFund",
+      "description": "Separate financial ledger entries for special events"
+    },
+    "announcements": {
+      "schema": "Announcement",
+      "description": "Notice board postings"
+    },
+    "agenda": {
+      "schema": "Agenda",
+      "description": "Interactive school planner schedules"
+    },
+    "tasks": {
+      "schema": "Task",
+      "description": "Shared homework assignments"
+    },
+    "polls": {
+      "schema": "Poll",
+      "description": "Class voting decisions"
+    },
+    "gallery": {
+      "schema": "Gallery",
+      "description": "Shared classroom memories and activities"
+    },
+    "files": {
+      "schema": "File",
+      "description": "Class files shared folder and links"
+    },
+    "meetings": {
+      "schema": "Meeting",
+      "description": "Detailed notes and rosters of classroom meetings"
+    },
+    "inventory": {
+      "schema": "Inventory",
+      "description": "Tool and asset inventory list"
+    },
+    "contacts": {
+      "schema": "Contact",
+      "description": "Key numbers list"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Activity updates"
+    },
+    "settings": {
+      "schema": "Setting",
+      "description": "Dynamic configurations of ClassHub"
+    },
+    "logs": {
+      "schema": "Log",
+      "description": "Auditable administrative actions and operations log"
+    },
+    "studyLinks": {
+      "schema": "StudyLink",
+      "description": "Shared online learning reference links"
+    },
+    "materials": {
+      "schema": "Material",
+      "description": "Uploaded or linked learning materials"
+    },
+    "quizScores": {
+      "schema": "QuizScore",
+      "description": "Scores recorded from student practice quizzes"
+    },
+    "studyTargets": {
+      "schema": "StudyTarget",
+      "description": "Self-set student study plan items"
+    },
+    "bookmarks": {
+      "schema": "Bookmark",
+      "description": "Bookmarked materials per student"
+    },
+    "gameData": {
+      "schema": "GameData",
+      "description": "Profile, stats, and coins for the gamified module"
+    },
+    "stickyNotes": {
+      "schema": "StickyNote",
+      "description": "Board memo stickies"
+    },
+    "discussions": {
+      "schema": "ChatMessage",
+      "description": "Classroom discussion board and chat messages"
+    },
+    "submissions": {
+      "schema": "Submission",
+      "description": "Student homework and assignment submissions"
+    }
+  }
+}

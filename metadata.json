@@ -1,0 +1,6 @@
+{
+  "name": "ClassHub XII TKJ 1",
+  "description": "Pusat Manajemen Digital Kelas XII TKJ 1 dengan UI Glassmorphism modern, data terintegrasi, dan AI Assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

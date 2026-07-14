@@ -1,0 +1,244 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserData().role == role;
+    }
+
+    function isSuperAdmin() {
+      return hasRole('Super Admin');
+    }
+
+    function isSetupNotCompleted() {
+      return !exists(/databases/$(database)/documents/settings/setup_status) || 
+             get(/databases/$(database)/documents/settings/setup_status).data.completed != true;
+    }
+
+    function isWakil() {
+      return hasRole('Wakil');
+    }
+
+    function isSekretaris() {
+      return hasRole('Sekretaris');
+    }
+
+    function isBendahara() {
+      return hasRole('Bendahara');
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isSuperAdmin() || request.auth.uid == userId || isSetupNotCompleted());
+      allow update: if isSignedIn() && (
+        isSuperAdmin() || 
+        isSetupNotCompleted() ||
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']))
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Schedules Collection
+    match /schedules/{scheduleId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isSekretaris();
+    }
+
+    // Pickets Collection
+    match /pickets/{picketId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isSekretaris();
+    }
+
+    // ClassFund Collection
+    match /classFund/{fundId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isSuperAdmin() || isBendahara() || request.resource.data.userId == request.auth.uid);
+      allow update: if isSuperAdmin() || isBendahara();
+      allow delete: if isSuperAdmin();
+    }
+
+    // EventFunds Collection
+    match /eventFunds/{fundId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isSuperAdmin() || isBendahara() || request.resource.data.userId == request.auth.uid);
+      allow update: if isSuperAdmin() || isBendahara();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isWakil();
+    }
+
+    // Agenda Collection
+    match /agenda/{agendaId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isWakil();
+    }
+
+    // Tasks Collection
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isWakil() || isSekretaris();
+    }
+
+    // Polls (Voting) Collection
+    match /polls/{pollId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSignedIn(); // Users can vote by updating options list
+    }
+
+    // Gallery Collection
+    match /gallery/{imageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isSuperAdmin() || (isSignedIn() && resource.data.uploaderId == request.auth.uid);
+    }
+
+    // Files Collection
+    match /files/{fileId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isSuperAdmin() || (isSignedIn() && resource.data.uploaderId == request.auth.uid);
+    }
+
+    // Meetings Collection
+    match /meetings/{meetingId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isSekretaris();
+    }
+
+    // Inventory Collection
+    match /inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSignedIn(); // Anyone can request a borrow/return
+    }
+
+    // Contacts Collection
+    match /contacts/{contactId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Learning Center & Mini Games Collections
+    match /studyLinks/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSuperAdmin() || isWakil() || isSekretaris();
+    }
+
+    match /materials/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /quizScores/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /studyTargets/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /bookmarks/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /gameData/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /stickyNotes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // To mark as read
+      allow delete: if isSuperAdmin();
+    }
+
+    // Settings Collection
+    match /settings/{settingId} {
+      allow read: if isSignedIn() || settingId == 'setup_status';
+      allow write: if isSuperAdmin() || 
+                    (settingId == 'classhub_config' && isBendahara()) || 
+                    (settingId == 'setup_status' && (!exists(/databases/$(database)/documents/settings/setup_status) || get(/databases/$(database)/documents/settings/setup_status).data.completed != true));
+    }
+
+    // Logs Collection
+    match /logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Logs are write-once and immutable
+    }
+
+    // Discussions Collection (Classroom Discussion Chat)
+    match /discussions/{msgId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // For adding/removing reactions
+      allow delete: if isSuperAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || !('userId' in resource.data)));
+    }
+
+    // Submissions Collection (Student Assignment Submissions)
+    match /submissions/{submissionId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isSuperAdmin() || 
+        isWakil() || 
+        isSekretaris() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().jabatan == 'Ketua Kelas' || 
+          getUserData().jabatan == 'Guru' || 
+          getUserData().jabatan == 'Wali Kelas'
+        ))
+      );
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isSuperAdmin() || 
+        isWakil() || 
+        isSekretaris() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().jabatan == 'Ketua Kelas' || 
+          getUserData().jabatan == 'Guru' || 
+          getUserData().jabatan == 'Wali Kelas'
+        ))
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isSuperAdmin() || 
+        isWakil() || 
+        isSekretaris() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().jabatan == 'Ketua Kelas' || 
+          getUserData().jabatan == 'Guru' || 
+          getUserData().jabatan == 'Wali Kelas'
+        ))
+      );
+    }
+  }
+}
