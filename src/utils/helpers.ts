@@ -258,3 +258,14 @@ export function printPDF(title: string, headers: string[], rows: string[][]) {
   printWindow.document.write(html);
   printWindow.document.close();
 }
+
+// Check if current week of the year is odd (ganjil)
+export function isOddWeek(dateInput: Date = new Date()): boolean {
+  const d = new Date(Date.UTC(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return weekNo % 2 !== 0;
+}
+

@@ -839,3 +839,37 @@ export async function deleteSubmission(id: string) {
   }
 }
 
+// --- COUNTDOWN SETTINGS ---
+export async function getCountdownSettings() {
+  try {
+    const docRef = doc(db, "settings", "countdowns");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data();
+    }
+  } catch (error) {
+    console.error("Gagal mengambil pengaturan countdown:", error);
+  }
+  // Return defaults if not set in Firestore
+  return {
+    graduation: "2027-05-15T08:00:00",
+    ukk: "2027-02-20T08:00:00",
+    pkl: "2026-09-01T08:00:00",
+    perpisahan: "2027-05-20T10:00:00"
+  };
+}
+
+export async function saveCountdownSettings(data: any) {
+  const path = "settings/countdowns";
+  try {
+    await setDoc(doc(db, "settings", "countdowns"), {
+      ...data,
+      updatedAt: serverTimestamp()
+    });
+    await writeAuditLog("Save Countdowns", "Memperbarui konfigurasi target countdown dashboard");
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+

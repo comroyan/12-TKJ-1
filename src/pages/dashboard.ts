@@ -4,10 +4,13 @@ import {
   getTasks, 
   getAgendas, 
   getSchedules, 
-  getPickets 
+  getPickets,
+  getCountdownSettings,
+  saveCountdownSettings
 } from "../firebase/db";
-import { formatRupiah, renderIcons } from "../utils/helpers";
+import { formatRupiah, renderIcons, isOddWeek, toast } from "../utils/helpers";
 import Chart from "chart.js/auto";
+import Swal from "sweetalert2";
 
 export async function renderDashboard(container: HTMLElement, userSession: any) {
   // Loading skeleton
@@ -27,15 +30,23 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     </div>
   `;
 
-  // Fetch all dashboard relevant data in parallel
-  const [students, funds, tasks, agendas, schedules, pickets] = await Promise.all([
+  // Fetch all dashboard relevant data in parallel including customizable countdown targets
+  const [students, funds, tasks, agendas, schedules, pickets, countdownSettings] = await Promise.all([
     getStudentUsers(),
     getClassFunds(),
     getTasks(),
     getAgendas(),
     getSchedules(),
-    getPickets()
+    getPickets(),
+    getCountdownSettings()
   ]);
+
+  // Check if current user has Class President/Editor privilege to edit countdowns
+  const isKetuaKelas = userSession.role === "Super Admin" || 
+                       userSession.role === "Ketua Kelas" || 
+                       userSession.jabatan === "Ketua Kelas" || 
+                       userSession.role === "Wakil" || 
+                       userSession.role === "Sekretaris";
 
   // Calculate Cash Balance
   const approvedFunds = funds.filter((f: any) => f.status === "approved" || !f.status);
@@ -46,8 +57,18 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   // Next lesson & picket calculation
   const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
   const todayDay = days[new Date().getDay()];
-  const todaySchedules = (schedules.find((s: any) => s.id === todayDay) || { subjects: [] }) as any;
   const todayPickets = (pickets.find((p: any) => p.id === todayDay) || { members: [] }) as any;
+
+  // Odd/Even week subject schedules resolving
+  const calendarIsOdd = isOddWeek();
+  const currentWeekType = calendarIsOdd ? "ganjil" : "genap";
+  const todayWeekDayId = `${todayDay}_${currentWeekType}`;
+  
+  let todaySchedules = schedules.find((s: any) => s.id === todayWeekDayId) as any;
+  if (!todaySchedules) {
+    // Fallback to the default general day schedule
+    todaySchedules = (schedules.find((s: any) => s.id === todayDay) || { subjects: [] }) as any;
+  }
 
   // Filter tasks and agendas
   const pendingTasksCount = tasks.filter((t: any) => t.status === "pending").length;
@@ -62,18 +83,18 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   ];
   const quote = quotes[Math.floor(Math.random() * quotes.length)];
 
-  // Countdowns calculations (Target: Year 2026/2027 milestones)
-  const milestoneGraduation = new Date("2027-05-15T08:00:00").getTime();
-  const milestoneUKK = new Date("2027-02-20T08:00:00").getTime();
-  const milestonePKL = new Date("2026-09-01T08:00:00").getTime();
-  const milestonePerpisahan = new Date("2027-05-20T10:00:00").getTime();
+  // Get custom countdown target timestamps
+  const milestoneGraduation = new Date(countdownSettings.graduation).getTime();
+  const milestoneUKK = new Date(countdownSettings.ukk).getTime();
+  const milestonePKL = new Date(countdownSettings.pkl).getTime();
+  const milestonePerpisahan = new Date(countdownSettings.perpisahan).getTime();
 
   function getCountdownString(targetTime: number): string {
     const diff = targetTime - Date.now();
-    if (diff <= 0) return "Selesai/Lewat";
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    return `${days} Hari ${hours} Jam`;
+    if (isNaN(diff) || diff <= 0) return "Selesai/Lewat";
+    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return `${d} Hari ${h} Jam`;
   }
 
   // Dashboard HTML
@@ -98,27 +119,40 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
         </div>
       </div>
 
-      <!-- Quick Countdown Widgets Grid -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-rose-500 relative overflow-hidden">
-          <span class="text-xs text-slate-400 font-medium block">Countdown Kelulusan</span>
-          <span class="text-base md:text-lg font-bold font-mono text-rose-400 mt-1 block" id="cd-grad">${getCountdownString(milestoneGraduation)}</span>
-          <div class="absolute right-2 bottom-2 text-rose-500/10"><i data-lucide="award" class="w-8 h-8"></i></div>
+      <!-- Quick Countdown Grid Section with Ketua Kelas Edit Action -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold font-display tracking-wider text-slate-400 uppercase flex items-center gap-2">
+            <i data-lucide="clock" class="text-cyan-400 w-4 h-4"></i> Milestone & Kegiatan Kelas
+          </h2>
+          ${isKetuaKelas ? `
+            <button id="editCountdownsBtn" class="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 text-[11px] font-semibold transition-all shadow-sm">
+              <i data-lucide="edit" class="w-3 h-3"></i>
+              Atur Countdown
+            </button>
+          ` : ""}
         </div>
-        <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-amber-500 relative overflow-hidden">
-          <span class="text-xs text-slate-400 font-medium block">Countdown Ujian UKK</span>
-          <span class="text-base md:text-lg font-bold font-mono text-amber-400 mt-1 block" id="cd-ukk">${getCountdownString(milestoneUKK)}</span>
-          <div class="absolute right-2 bottom-2 text-amber-500/10"><i data-lucide="shield-alert" class="w-8 h-8"></i></div>
-        </div>
-        <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-cyan-500 relative overflow-hidden">
-          <span class="text-xs text-slate-400 font-medium block">Countdown PKL</span>
-          <span class="text-base md:text-lg font-bold font-mono text-cyan-400 mt-1 block" id="cd-pkl">${getCountdownString(milestonePKL)}</span>
-          <div class="absolute right-2 bottom-2 text-cyan-500/10"><i data-lucide="calendar" class="w-8 h-8"></i></div>
-        </div>
-        <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-purple-500 relative overflow-hidden">
-          <span class="text-xs text-slate-400 font-medium block">Countdown Perpisahan</span>
-          <span class="text-base md:text-lg font-bold font-mono text-purple-400 mt-1 block" id="cd-perpisahan">${getCountdownString(milestonePerpisahan)}</span>
-          <div class="absolute right-2 bottom-2 text-purple-500/10"><i data-lucide="heart" class="w-8 h-8"></i></div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-rose-500 relative overflow-hidden">
+            <span class="text-xs text-slate-400 font-medium block">Countdown Kelulusan</span>
+            <span class="text-base md:text-lg font-bold font-mono text-rose-400 mt-1 block" id="cd-grad">${getCountdownString(milestoneGraduation)}</span>
+            <div class="absolute right-2 bottom-2 text-rose-500/10"><i data-lucide="award" class="w-8 h-8"></i></div>
+          </div>
+          <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-amber-500 relative overflow-hidden">
+            <span class="text-xs text-slate-400 font-medium block">Countdown Ujian UKK</span>
+            <span class="text-base md:text-lg font-bold font-mono text-amber-400 mt-1 block" id="cd-ukk">${getCountdownString(milestoneUKK)}</span>
+            <div class="absolute right-2 bottom-2 text-amber-500/10"><i data-lucide="shield-alert" class="w-8 h-8"></i></div>
+          </div>
+          <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-cyan-500 relative overflow-hidden">
+            <span class="text-xs text-slate-400 font-medium block">Countdown PKL</span>
+            <span class="text-base md:text-lg font-bold font-mono text-cyan-400 mt-1 block" id="cd-pkl">${getCountdownString(milestonePKL)}</span>
+            <div class="absolute right-2 bottom-2 text-cyan-500/10"><i data-lucide="calendar" class="w-8 h-8"></i></div>
+          </div>
+          <div class="p-4 glass stat-card rounded-2xl border-l-4 border-l-purple-500 relative overflow-hidden">
+            <span class="text-xs text-slate-400 font-medium block">Countdown Perpisahan</span>
+            <span class="text-base md:text-lg font-bold font-mono text-purple-400 mt-1 block" id="cd-perpisahan">${getCountdownString(milestonePerpisahan)}</span>
+            <div class="absolute right-2 bottom-2 text-purple-500/10"><i data-lucide="heart" class="w-8 h-8"></i></div>
+          </div>
         </div>
       </div>
 
@@ -235,9 +269,14 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
 
         <!-- Today's Schedule -->
         <div class="p-6 glass rounded-3xl">
-          <h3 class="text-lg font-bold font-display text-white flex items-center gap-2 mb-3">
-            <i data-lucide="book-open" class="w-5 h-5 text-yellow-400"></i> Pelajaran Hari Ini (${todayDay})
-          </h3>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-bold font-display text-white flex items-center gap-2">
+              <i data-lucide="book-open" class="w-5 h-5 text-yellow-400"></i> Pelajaran Hari Ini (${todayDay})
+            </h3>
+            <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-900 text-slate-400 border border-slate-850">
+              Minggu ${calendarIsOdd ? 'Ganjil' : 'Genap'}
+            </span>
+          </div>
           <div class="space-y-2">
             ${todaySchedules.subjects && todaySchedules.subjects.length > 0 ? todaySchedules.subjects.map((s: any) => `
               <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-800/40 border border-slate-700/30">
@@ -264,6 +303,73 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   `;
 
   renderIcons();
+
+  // Attach countdown editor listener for Ketua Kelas
+  if (isKetuaKelas) {
+    const editBtn = document.getElementById("editCountdownsBtn");
+    if (editBtn) {
+      editBtn.addEventListener("click", () => {
+        Swal.fire({
+          title: "Konfigurasi Target Countdown",
+          background: "#0f172a",
+          color: "#f8fafc",
+          html: `
+            <div class="space-y-4 text-left font-sans mt-2">
+              <p class="text-xs text-slate-400 leading-snug mb-2">Tentukan tanggal dan waktu target untuk masing-masing milestone kelas XII TKJ 1:</p>
+              <div>
+                <label class="block text-xs font-bold text-rose-400 mb-1">Tanggal Kelulusan</label>
+                <input type="datetime-local" id="set-graduation" value="${countdownSettings.graduation ? countdownSettings.graduation.substring(0, 16) : '2027-05-15T08:00'}" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-amber-400 mb-1">Tanggal Ujian UKK</label>
+                <input type="datetime-local" id="set-ukk" value="${countdownSettings.ukk ? countdownSettings.ukk.substring(0, 16) : '2027-02-20T08:00'}" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-cyan-400 mb-1">Tanggal Mulai PKL</label>
+                <input type="datetime-local" id="set-pkl" value="${countdownSettings.pkl ? countdownSettings.pkl.substring(0, 16) : '2026-09-01T08:00'}" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-purple-400 mb-1">Tanggal Perpisahan</label>
+                <input type="datetime-local" id="set-perpisahan" value="${countdownSettings.perpisahan ? countdownSettings.perpisahan.substring(0, 16) : '2027-05-20T10:00'}" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+              </div>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "Simpan Target",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#06b6d4",
+          cancelButtonColor: "#334155",
+          preConfirm: () => {
+            const gradVal = (document.getElementById("set-graduation") as HTMLInputElement).value;
+            const ukkVal = (document.getElementById("set-ukk") as HTMLInputElement).value;
+            const pklVal = (document.getElementById("set-pkl") as HTMLInputElement).value;
+            const perpVal = (document.getElementById("set-perpisahan") as HTMLInputElement).value;
+            
+            if (!gradVal || !ukkVal || !pklVal || !perpVal) {
+              Swal.showValidationMessage("Semua tanggal target harus diisi!");
+              return false;
+            }
+            return {
+              graduation: gradVal,
+              ukk: ukkVal,
+              pkl: pklVal,
+              perpisahan: perpVal
+            };
+          }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            try {
+              await saveCountdownSettings(result.value);
+              toast.success("Target countdown berhasil diperbarui!");
+              renderDashboard(container, userSession); // Re-render dashboard seamlessly
+            } catch (err: any) {
+              Swal.fire("Gagal menyimpan", err.message, "error");
+            }
+          }
+        });
+      });
+    }
+  }
 
   // Draw chart
   const canvas = document.getElementById("cashFlowChart") as HTMLCanvasElement;
