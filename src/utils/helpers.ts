@@ -287,50 +287,99 @@ export function getApiUrl(path: string): string {
   return path;
 }
 
-// Reusable server-side upload helper which avoids CORS and direct browser Storage limitations
+// Reusable server-side upload helper which avoids CORS, with automatic browser-side Firebase Storage fallback
 export async function uploadFileToServer(
   file: File, 
   onProgress?: (progress: number) => void
 ): Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("file", file);
+  try {
+    // 1. Try uploading to Server first
+    const result = await new Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
 
-    xhr.open("POST", getApiUrl("/api/upload"));
+      xhr.open("POST", getApiUrl("/api/upload"));
 
-    if (onProgress) {
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          onProgress(percentComplete);
-        }
-      });
-    }
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response);
-        } catch (e) {
-          reject(new Error("Respon server tidak valid"));
-        }
-      } else {
-        try {
-          const errRes = JSON.parse(xhr.responseText);
-          reject(new Error(errRes.error || `Gagal mengunggah berkas (${xhr.status})`));
-        } catch {
-          reject(new Error(`Gagal mengunggah berkas dengan kode status ${xhr.status}`));
-        }
+      if (onProgress) {
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            onProgress(percentComplete);
+          }
+        });
       }
-    };
 
-    xhr.onerror = () => {
-      reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
-    };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch (e) {
+            reject(new Error("Respon server tidak valid"));
+          }
+        } else {
+          try {
+            const errRes = JSON.parse(xhr.responseText);
+            reject(new Error(errRes.error || `Gagal mengunggah berkas (${xhr.status})`));
+          } catch {
+            reject(new Error(`Gagal mengunggah berkas dengan kode status ${xhr.status}`));
+          }
+        }
+      };
 
-    xhr.send(formData);
-  });
+      xhr.onerror = () => {
+        reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
+      };
+
+      xhr.send(formData);
+    });
+    return result;
+  } catch (error) {
+    console.warn("Gagal mengunggah lewat server backend, mencoba fallback langsung ke Firebase Storage browser...", error);
+    
+    // 2. Fallback to direct client-side Firebase Storage Upload
+    try {
+      // Dynamic import to avoid circular dependencies and keep startup footprint light
+      const { storage } = await import("../firebase/config");
+      const { ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
+      
+      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      const storageRef = ref(storage, `fallback_uploads/${safeName}`);
+      
+      return await new Promise((resolve, reject) => {
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            if (onProgress) {
+              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              onProgress(progress);
+            }
+          },
+          (err) => {
+            console.error("Direct browser upload failed too:", err);
+            reject(new Error("Gagal mengunggah berkas ke Firebase Storage langsung: " + err.message));
+          },
+          async () => {
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve({
+                success: true,
+                fileUrl: downloadUrl,
+                fileName: file.name,
+                storage: "firebase_browser"
+              });
+            } catch (urlErr: any) {
+              reject(new Error("Gagal mendapatkan link unduhan berkas: " + urlErr.message));
+            }
+          }
+        );
+      });
+    } catch (fallbackError: any) {
+      console.error("Sistem upload backend maupun fallback browser keduanya gagal:", fallbackError);
+      throw new Error("Gagal mengunggah berkas: " + (fallbackError instanceof Error ? fallbackError.message : String(fallbackError)));
+    }
+  }
 }
 

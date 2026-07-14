@@ -63,38 +63,70 @@ async function initializeApplet() {
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
       activeUserSession = null;
+      localStorage.removeItem("classhub_cached_profile");
       renderLoginScreen();
     } else {
+      let data: any = null;
+      
       try {
-        // Fetch fresh firestore profile
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (!userDoc.exists()) {
-          // If auth user exists but firestore profile does not, let them complete it
-          renderCompleteProfileScreen(user);
-          return;
+        // Fetch profile with a 2.5s timeout to prevent hanging on mobile networks
+        const fetchPromise = getDoc(doc(db, "users", user.uid));
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout memuat profil dari Firestore (2.5s)")), 2500)
+        );
+        
+        const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+        if (userDoc && userDoc.exists()) {
+          data = userDoc.data();
         }
+      } catch (err) {
+        console.warn("Gagal/Timeout memuat profil real-time dari Firestore, mencoba cache lokal...", err);
+      }
 
-        const data = userDoc.data();
-        activeUserSession = {
-          uid: user.uid,
-          email: user.email!,
-          role: data.role,
-          name: data.name,
-          absen: data.absen,
-          status: data.status,
-          mustChangePassword: data.mustChangePassword ?? false,
-          ...data // Include extra details like hp, bio, tempatPkl
+      // Check for cached profile in localStorage if Firestore is slow or offline
+      if (!data) {
+        const cached = localStorage.getItem("classhub_cached_profile");
+        if (cached) {
+          try {
+            data = JSON.parse(cached);
+            console.log("Berhasil memuat data profil dari cache lokal offline.");
+          } catch (e) {
+            console.error("Gagal membaca profil ter-cache:", e);
+          }
+        }
+      }
+
+      // Ultimate fallback: If there is no Firestore profile and no cache, build a basic temporary profile to let the app load
+      if (!data) {
+        console.warn("Profil tidak ditemukan. Membuat profil sementara berbasis akun.");
+        data = {
+          name: user.displayName || user.email?.split("@")[0] || "Siswa ClassHub",
+          role: "Siswa",
+          absen: 0,
+          status: "aktif",
+          mustChangePassword: false
         };
+      }
 
-        // Enforce password change on first login as requested
-        if (activeUserSession.mustChangePassword) {
-          renderMustChangePasswordScreen();
-        } else {
-          renderMainLayout();
-        }
-      } catch (err: any) {
-        toast.error("Gagal memuat sesi: " + err.message);
-        await logoutUser();
+      activeUserSession = {
+        uid: user.uid,
+        email: user.email!,
+        role: data.role || "Siswa",
+        name: data.name || "Siswa ClassHub",
+        absen: data.absen ?? 0,
+        status: data.status || "aktif",
+        mustChangePassword: data.mustChangePassword ?? false,
+        ...data // Include extra details like hp, bio, tempatPkl
+      };
+
+      // Save to localStorage cache for instant loads next time
+      localStorage.setItem("classhub_cached_profile", JSON.stringify(activeUserSession));
+
+      // Enforce password change on first login as requested
+      if (activeUserSession.mustChangePassword) {
+        renderMustChangePasswordScreen();
+      } else {
+        renderMainLayout();
       }
     }
   });

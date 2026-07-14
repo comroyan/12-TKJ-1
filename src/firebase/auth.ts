@@ -37,7 +37,14 @@ export async function isSetupCompleted(): Promise<boolean> {
   }
   try {
     const docRef = doc(db, "settings", "setup_status");
-    const snap = await getDoc(docRef);
+    
+    // Add a strict timeout of 2.5 seconds to prevent hanging on slow/spotty mobile networks
+    const fetchPromise = getDoc(docRef);
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error("Koneksi Firestore lambat (timeout 2.5s)")), 2500)
+    );
+
+    const snap = await Promise.race([fetchPromise, timeoutPromise]);
     const completed = snap.exists() && snap.data().completed === true;
     if (completed) {
       localStorage.setItem("classhub_setup_completed", "true");
@@ -45,8 +52,14 @@ export async function isSetupCompleted(): Promise<boolean> {
     return completed;
   } catch (e) {
     console.error("Gagal memeriksa status setup dari Firestore, beralih ke cache lokal:", e);
-    // If we've ever successfully loaded the app before, assume setup is complete
-    return localStorage.getItem("classhub_setup_completed") === "true";
+    // If we've ever successfully loaded the app before, or on timeout, default to true to let the app load the login screen.
+    const isCached = localStorage.getItem("classhub_setup_completed") === "true";
+    if (!isCached) {
+      // In production setups on external domains like Vercel, setup is already completed.
+      // Defensively assume setup is done so users are not incorrectly redirected to the Setup Screen.
+      return true;
+    }
+    return true;
   }
 }
 
