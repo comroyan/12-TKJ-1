@@ -14,7 +14,7 @@ service cloud.firestore {
     function hasRole(role) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role == role;
+        getUserData().get('role', '') == role;
     }
 
     function isSuperAdmin() {
@@ -36,6 +36,26 @@ service cloud.firestore {
 
     function isBendahara() {
       return hasRole('Bendahara');
+    }
+
+    function isPrivilegedUser() {
+      return isSignedIn() && (
+        isSuperAdmin() || 
+        isWakil() || 
+        isSekretaris() || 
+        hasRole('Guru') ||
+        hasRole('Wali Kelas') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().get('jabatan', '') == 'Ketua Kelas' ||
+          getUserData().get('jabatan', '') == 'Guru' ||
+          getUserData().get('jabatan', '') == 'Wali Kelas' ||
+          getUserData().get('role', '') == 'Guru' ||
+          getUserData().get('role', '') == 'Wali Kelas' ||
+          getUserData().get('jabatan', '').toLower().matches('.*guru.*') ||
+          getUserData().get('jabatan', '').toLower().matches('.*wali.*') ||
+          getUserData().get('jabatan', '').toLower().matches('.*ketua.*')
+        ))
+      );
     }
 
     // Default deny catch-all
@@ -92,23 +112,13 @@ service cloud.firestore {
     // Agenda Collection
     match /agenda/{agendaId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isWakil() || isSekretaris() ||
-                    (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-                      getUserData().jabatan == 'Ketua Kelas' || 
-                      getUserData().jabatan == 'Guru' || 
-                      getUserData().jabatan == 'Wali Kelas'
-                    ));
+      allow write: if isPrivilegedUser();
     }
 
     // Tasks Collection
     match /tasks/{taskId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isWakil() || isSekretaris() ||
-                    (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-                      getUserData().jabatan == 'Ketua Kelas' || 
-                      getUserData().jabatan == 'Guru' || 
-                      getUserData().jabatan == 'Wali Kelas'
-                    ));
+      allow write: if isPrivilegedUser();
     }
 
     // Polls (Voting) Collection
@@ -217,37 +227,16 @@ service cloud.firestore {
     match /submissions/{submissionId} {
       allow read: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        isSuperAdmin() || 
-        isWakil() || 
-        isSekretaris() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          getUserData().jabatan == 'Ketua Kelas' || 
-          getUserData().jabatan == 'Guru' || 
-          getUserData().jabatan == 'Wali Kelas'
-        ))
+        isPrivilegedUser()
       );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        isSuperAdmin() || 
-        isWakil() || 
-        isSekretaris() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          getUserData().jabatan == 'Ketua Kelas' || 
-          getUserData().jabatan == 'Guru' || 
-          getUserData().jabatan == 'Wali Kelas'
-        ))
+        isPrivilegedUser()
       );
       allow delete: if isSignedIn() && (
         resource.data.userId == request.auth.uid || 
-        isSuperAdmin() || 
-        isWakil() || 
-        isSekretaris() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          getUserData().jabatan == 'Ketua Kelas' || 
-          getUserData().jabatan == 'Guru' || 
-          getUserData().jabatan == 'Wali Kelas'
-        ))
+        isPrivilegedUser()
       );
     }
   }

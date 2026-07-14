@@ -328,11 +328,11 @@ export async function uploadFileToServer(
       const formData = new FormData();
       formData.append("file", file);
 
-      // Add a client-side timeout of 5.5 seconds to prevent hanging on slow network or scaled-down backend
+      // Add a client-side timeout of 180 seconds to prevent hanging on slow network or scaled-down backend
       const uploadTimeout = setTimeout(() => {
         xhr.abort();
-        reject(new Error("Timeout mengunggah ke server (5.5s)"));
-      }, 5500);
+        reject(new Error("Timeout mengunggah ke server (Batas waktu 180 detik terlampaui)"));
+      }, 180000);
 
       xhr.open("POST", getApiUrl("/api/upload"));
 
@@ -387,11 +387,11 @@ export async function uploadFileToServer(
       return await new Promise((resolve, reject) => {
         const uploadTask = uploadBytesResumable(storageRef, file);
         
-        // Storage task strict timeout (5.5s) to prevent sticking at 0% in retrying states if Storage is uninitialized/disabled
+        // Storage task strict timeout (180s) to prevent sticking at 0% in retrying states if Storage is uninitialized/disabled
         const storageTimeout = setTimeout(() => {
           uploadTask.cancel();
-          reject(new Error("Timeout mengunggah langsung ke Firebase Storage (5.5s)"));
-        }, 5500);
+          reject(new Error("Timeout mengunggah langsung ke Firebase Storage (Batas waktu 180 detik terlampaui)"));
+        }, 180000);
 
         uploadTask.on(
           "state_changed",

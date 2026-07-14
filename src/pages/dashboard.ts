@@ -12,6 +12,8 @@ import { formatRupiah, renderIcons, isOddWeek, toast } from "../utils/helpers";
 import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
 
+let activeCashFlowChart: any = null;
+
 export async function renderDashboard(container: HTMLElement, userSession: any) {
   // Loading skeleton
   container.innerHTML = `
@@ -374,9 +376,21 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   // Draw chart
   const canvas = document.getElementById("cashFlowChart") as HTMLCanvasElement;
   if (canvas) {
-    const existingChart = Chart.getChart(canvas);
-    if (existingChart) {
-      existingChart.destroy();
+    if (activeCashFlowChart) {
+      try {
+        activeCashFlowChart.destroy();
+      } catch (err) {
+        console.warn("Error destroying cached activeCashFlowChart:", err);
+      }
+      activeCashFlowChart = null;
+    }
+    try {
+      const existingChart = Chart.getChart(canvas);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+    } catch (err) {
+      console.warn("Error destroying chart via Chart.getChart:", err);
     }
 
     // Collect monthly fund summary
@@ -410,49 +424,53 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
       displayOut.push(monthlyDataOut[idx]);
     }
 
-    new Chart(canvas, {
-      type: "bar",
-      data: {
-        labels: displayMonths,
-        datasets: [
-          {
-            label: "Kas Masuk (Rp)",
-            data: displayIn,
-            backgroundColor: "rgba(16, 185, 129, 0.6)",
-            borderColor: "rgba(16, 185, 129, 1)",
-            borderWidth: 1,
-            borderRadius: 6,
-          },
-          {
-            label: "Kas Keluar (Rp)",
-            data: displayOut,
-            backgroundColor: "rgba(239, 68, 68, 0.6)",
-            borderColor: "rgba(239, 68, 68, 1)",
-            borderWidth: 1,
-            borderRadius: 6,
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: { color: "#94a3b8", font: { family: "Inter" } }
-          }
+    try {
+      activeCashFlowChart = new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: displayMonths,
+          datasets: [
+            {
+              label: "Kas Masuk (Rp)",
+              data: displayIn,
+              backgroundColor: "rgba(16, 185, 129, 0.6)",
+              borderColor: "rgba(16, 185, 129, 1)",
+              borderWidth: 1,
+              borderRadius: 6,
+            },
+            {
+              label: "Kas Keluar (Rp)",
+              data: displayOut,
+              backgroundColor: "rgba(239, 68, 68, 0.6)",
+              borderColor: "rgba(239, 68, 68, 1)",
+              borderWidth: 1,
+              borderRadius: 6,
+            }
+          ]
         },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: "#94a3b8" }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: "#94a3b8", font: { family: "Inter" } }
+            }
           },
-          y: {
-            grid: { color: "rgba(255, 255, 255, 0.05)" },
-            ticks: { color: "#94a3b8" }
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: "#94a3b8" }
+            },
+            y: {
+              grid: { color: "rgba(255, 255, 255, 0.05)" },
+              ticks: { color: "#94a3b8" }
+            }
           }
         }
-      }
-    });
+      });
+    } catch (err) {
+      console.error("Gagal membuat objek Chart Aliran Keuangan Kas:", err);
+    }
   }
 
   // Live updates of countdowns
