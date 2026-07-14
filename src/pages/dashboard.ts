@@ -374,6 +374,11 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   // Draw chart
   const canvas = document.getElementById("cashFlowChart") as HTMLCanvasElement;
   if (canvas) {
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+      existingChart.destroy();
+    }
+
     // Collect monthly fund summary
     const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
     const monthlyDataIn = Array(12).fill(0);

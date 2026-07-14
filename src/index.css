@@ -36,17 +36,13 @@
 
 /* Custom glassmorphism utilities matching the requested theme */
 .glass {
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: rgba(15, 23, 42, 0.98); /* Solid dark slate-950 color for clean styling & mobile performance */
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
 }
 
 .glass-light {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(248, 250, 252, 0.98); /* Solid slate-50 light color */
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
