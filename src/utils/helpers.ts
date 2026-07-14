@@ -269,10 +269,40 @@ export function isOddWeek(dateInput: Date = new Date()): boolean {
   return weekNo % 2 !== 0;
 }
 
+let activeBackendBase = "https://ais-dev-i66yyju5cwidah224f6iqz-705381100555.asia-southeast1.run.app";
+
+// Dynamic active backend detection to always route through the running container (Dev or Pre)
+if (typeof window !== "undefined") {
+  const currentOrigin = window.location.origin;
+  if (currentOrigin.includes("run.app")) {
+    activeBackendBase = currentOrigin;
+  } else {
+    const devUrl = "https://ais-dev-i66yyju5cwidah224f6iqz-705381100555.asia-southeast1.run.app";
+    const preUrl = "https://ais-pre-i66yyju5cwidah224f6iqz-705381100555.asia-southeast1.run.app";
+
+    // Fast parallel ping to find whichever is active right now
+    Promise.any([
+      fetch(`${devUrl}/api/health`).then(res => { if (res.ok) return devUrl; throw new Error(); }),
+      fetch(`${preUrl}/api/health`).then(res => { if (res.ok) return preUrl; throw new Error(); })
+    ]).then(url => {
+      activeBackendBase = url;
+      console.log("ClassHub: Terhubung ke backend aktif:", url);
+    }).catch(() => {
+      // Default to dev container as it's the active workspace container
+      activeBackendBase = devUrl;
+    });
+  }
+}
+
 // Get correct API / resource URL when running statically on external hosts like Vercel
 export function getApiUrl(path: string): string {
   if (!path) return "";
-  if (path.startsWith("http://") || path.startsWith("https://")) {
+  if (
+    path.startsWith("http://") || 
+    path.startsWith("https://") || 
+    path.startsWith("data:") || 
+    path.startsWith("blob:")
+  ) {
     return path;
   }
   const currentOrigin = window.location.origin;
@@ -281,8 +311,7 @@ export function getApiUrl(path: string): string {
     currentOrigin.includes("github.io") ||
     (!currentOrigin.includes("run.app") && !currentOrigin.includes("localhost") && !currentOrigin.includes("127.0.0.1"))
   ) {
-    const backendBase = "https://ais-pre-i66yyju5cwidah224f6iqz-705381100555.asia-southeast1.run.app";
-    return `${backendBase}${path.startsWith("/") ? path : "/" + path}`;
+    return `${activeBackendBase}${path.startsWith("/") ? path : "/" + path}`;
   }
   return path;
 }
@@ -357,6 +386,13 @@ export async function uploadFileToServer(
       
       return await new Promise((resolve, reject) => {
         const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        // Storage task strict timeout (5.5s) to prevent sticking at 0% in retrying states if Storage is uninitialized/disabled
+        const storageTimeout = setTimeout(() => {
+          uploadTask.cancel();
+          reject(new Error("Timeout mengunggah langsung ke Firebase Storage (5.5s)"));
+        }, 5500);
+
         uploadTask.on(
           "state_changed",
           (snapshot) => {
@@ -366,10 +402,12 @@ export async function uploadFileToServer(
             }
           },
           (err) => {
+            clearTimeout(storageTimeout);
             console.error("Direct browser upload failed too:", err);
             reject(new Error("Gagal mengunggah berkas ke Firebase Storage langsung: " + err.message));
           },
           async () => {
+            clearTimeout(storageTimeout);
             try {
               const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
               resolve({
@@ -385,8 +423,40 @@ export async function uploadFileToServer(
         );
       });
     } catch (fallbackError: any) {
-      console.error("Sistem upload backend maupun fallback browser keduanya gagal:", fallbackError);
-      throw new Error("Gagal mengunggah berkas: " + (fallbackError instanceof Error ? fallbackError.message : String(fallbackError)));
+      console.warn("Sistem upload cloud backend maupun fallback Firebase browser keduanya gagal/timeout. Menggunakan Ultimate Base64 Fallback...", fallbackError);
+      
+      // 3. Ultimate Fallback: Base64 data-URL inline storage for files (e.g. screenshots < 800KB)
+      // This is 100% robust, requires zero server/bucket setup, and works beautifully even in static-only hosting.
+      try {
+        if (file.size > 1024 * 1024) {
+          throw new Error("Berkas melebihi batas ukuran 1MB untuk mode luring.");
+        }
+        
+        if (onProgress) {
+          onProgress(30);
+        }
+        
+        const base64Url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Gagal memproses berkas lokal"));
+          reader.readAsDataURL(file);
+        });
+        
+        if (onProgress) {
+          onProgress(100);
+        }
+        
+        console.log("Berhasil memproses berkas sebagai Base64 URI fallback.");
+        return {
+          success: true,
+          fileUrl: base64Url,
+          fileName: file.name,
+          storage: "base64"
+        };
+      } catch (base64Err: any) {
+        throw new Error("Gagal memproses file lokal: " + base64Err.message);
+      }
     }
   }
 }
