@@ -8,7 +8,7 @@ import {
 } from "../firebase/db";
 import { storage } from "../firebase/config";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { renderIcons, formatDate, toast, confirmDialog } from "../utils/helpers";
+import { renderIcons, formatDate, toast, confirmDialog, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderGaleri(container: HTMLElement, userSession: any) {
@@ -236,10 +236,9 @@ export async function renderGaleri(container: HTMLElement, userSession: any) {
             return false;
           }
 
-          toast.info("Mengunggah foto momen ke Cloud Storage...");
-          const storageRef = ref(storage, `gallery/${Date.now()}-${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          const imageUrl = await getDownloadURL(snapshot.ref);
+          toast.info("Mengunggah foto momen...");
+          const uploadResult = await uploadFileToServer(file);
+          const imageUrl = uploadResult.fileUrl;
 
           return { title, description, imageUrl, uploadedBy: userSession.name, userId: userSession.uid };
         }

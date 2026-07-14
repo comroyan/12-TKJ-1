@@ -1,5 +1,5 @@
 import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask } from "../firebase/db";
-import { renderIcons, formatDate, toast, confirmDialog, getApiUrl } from "../utils/helpers";
+import { renderIcons, formatDate, toast, confirmDialog, getApiUrl, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase/config";
@@ -532,32 +532,14 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
           throw new Error("Berkas lampiran tidak ditemukan.");
         }
 
-        console.log("Mencoba unggah langsung ke Firebase Storage...");
-        const safeName = `${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-        const storageRef = ref(storage, `submissions/${userSession.uid}/${safeName}`);
-
-        const fileUrl = await new Promise<string>((resolve, reject) => {
-          const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-          uploadTask.on('state_changed',
-            (snapshot) => {
-              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              progressBar.style.width = progress + "%";
-              progressPercentage.textContent = progress + "%";
-            },
-            (error) => {
-              console.error("Firebase Storage Upload Error:", error);
-              reject(new Error("Gagal mengunggah berkas ke Firebase Storage: " + error.message));
-            },
-            async () => {
-              try {
-                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(downloadUrl);
-              } catch (err: any) {
-                reject(new Error("Gagal mendapatkan link unduhan berkas: " + err.message));
-              }
-            }
-          );
+        console.log("Mencoba unggah berkas melalui server ke Firebase Storage...");
+        
+        const uploadResult = await uploadFileToServer(selectedFile, (progress) => {
+          progressBar.style.width = progress + "%";
+          progressPercentage.textContent = progress + "%";
         });
+
+        const fileUrl = uploadResult.fileUrl;
 
         // Ensure we have a valid URL
         if (!fileUrl) {

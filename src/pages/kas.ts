@@ -13,7 +13,7 @@ import {
 } from "../firebase/db";
 import { storage } from "../firebase/config";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { formatRupiah, formatDate, renderIcons, toast, confirmDialog, exportToCSV, printPDF } from "../utils/helpers";
+import { formatRupiah, formatDate, renderIcons, toast, confirmDialog, exportToCSV, printPDF, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderKas(container: HTMLElement, userSession: any) {
@@ -804,10 +804,9 @@ export async function renderKas(container: HTMLElement, userSession: any) {
 
           let evidenceUrl = "";
           if (file) {
-            toast.info("Mengunggah bukti ke Cloud Storage...");
-            const storageRef = ref(storage, `receipts/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            evidenceUrl = await getDownloadURL(snapshot.ref);
+            toast.info("Mengunggah bukti...");
+            const uploadResult = await uploadFileToServer(file);
+            evidenceUrl = uploadResult.fileUrl;
           }
 
           return { evidenceUrl, desc };
@@ -1088,10 +1087,9 @@ export async function renderKas(container: HTMLElement, userSession: any) {
 
             let evidenceUrl = "";
             if (file) {
-              toast.info("Mengunggah bukti transaksi ke Cloud Storage...");
-              const storageRef = ref(storage, `receipts/${Date.now()}-${file.name}`);
-              const snapshot = await uploadBytes(storageRef, file);
-              evidenceUrl = await getDownloadURL(snapshot.ref);
+              toast.info("Mengunggah bukti transaksi...");
+              const uploadResult = await uploadFileToServer(file);
+              evidenceUrl = uploadResult.fileUrl;
             }
 
             if (cat === "kas_regular") {

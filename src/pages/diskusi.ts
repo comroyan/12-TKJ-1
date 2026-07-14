@@ -13,7 +13,7 @@ import {
   toggleMessageReaction 
 } from "../firebase/db";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { renderIcons, toast, formatDate } from "../utils/helpers";
+import { renderIcons, toast, formatDate, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 // Elevated to file/module level to prevent duplicate snapshot memory leak on route changes
@@ -305,9 +305,8 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
 
         if (attachedFile) {
           toast.info("Mengunggah berkas...");
-          const storageRef = ref(storage, `discussions/${Date.now()}-${attachedFile.name}`);
-          const snapshot = await uploadBytes(storageRef, attachedFile);
-          attachmentUrl = await getDownloadURL(snapshot.ref);
+          const uploadResult = await uploadFileToServer(attachedFile);
+          attachmentUrl = uploadResult.fileUrl;
           attachmentType = attachedFile.type;
           attachmentName = attachedFile.name;
         }

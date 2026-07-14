@@ -4,8 +4,28 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import multer from "multer";
 import fs from "fs";
+import { initializeApp } from "firebase/app";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 dotenv.config();
+
+// Initialize Firebase on the server side
+const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+let firebaseApp: any;
+let firebaseStorage: any;
+
+if (fs.existsSync(configPath)) {
+  try {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    firebaseApp = initializeApp(firebaseConfig);
+    firebaseStorage = getStorage(firebaseApp);
+    console.log("Firebase Storage initialized successfully on the server side.");
+  } catch (err) {
+    console.error("Gagal menginisialisasi Firebase di server:", err);
+  }
+} else {
+  console.warn("firebase-applet-config.json tidak ditemukan di root workspace.");
+}
 
 async function startServer() {
   const app = express();
@@ -59,15 +79,46 @@ async function startServer() {
         return res.status(400).json({ error: "Tidak ada file yang diunggah" });
       }
       
-      // Local fallback path
-      const fileUrl = `/uploads/${req.file.filename}`;
+      const localFilePath = req.file.path;
+      const originalName = req.file.originalname;
+      const mimeType = req.file.mimetype;
 
-      res.json({ 
-        success: true, 
-        fileUrl, 
-        fileName: req.file.originalname,
-        storage: "local"
-      });
+      if (firebaseStorage) {
+        console.log(`Mengunggah ${originalName} ke Firebase Storage dari server...`);
+        const fileBuffer = fs.readFileSync(localFilePath);
+        
+        // Buat nama berkas unik yang aman
+        const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+        const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
+        
+        // Unggah ke Firebase Storage
+        await uploadBytes(storageRef, fileBuffer, { contentType: mimeType });
+        const downloadUrl = await getDownloadURL(storageRef);
+        console.log("Berhasil mengunggah ke Firebase Storage:", downloadUrl);
+
+        // Hapus file lokal sementara untuk hemat ruang disk
+        try {
+          fs.unlinkSync(localFilePath);
+        } catch (unlinkErr) {
+          console.warn("Gagal menghapus file sementara:", unlinkErr);
+        }
+
+        return res.json({
+          success: true,
+          fileUrl: downloadUrl,
+          fileName: originalName,
+          storage: "firebase"
+        });
+      } else {
+        console.warn("Firebase Storage tidak terkonfigurasi, beralih ke lokal.");
+        const fileUrl = `/uploads/${req.file.filename}`;
+        return res.json({ 
+          success: true, 
+          fileUrl, 
+          fileName: originalName,
+          storage: "local"
+        });
+      }
     } catch (error: any) {
       console.error("Upload Error:", error);
       res.status(500).json({ error: error.message || "Gagal mengunggah berkas" });

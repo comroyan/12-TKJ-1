@@ -287,3 +287,50 @@ export function getApiUrl(path: string): string {
   return path;
 }
 
+// Reusable server-side upload helper which avoids CORS and direct browser Storage limitations
+export async function uploadFileToServer(
+  file: File, 
+  onProgress?: (progress: number) => void
+): Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    xhr.open("POST", getApiUrl("/api/upload"));
+
+    if (onProgress) {
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          onProgress(percentComplete);
+        }
+      });
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response);
+        } catch (e) {
+          reject(new Error("Respon server tidak valid"));
+        }
+      } else {
+        try {
+          const errRes = JSON.parse(xhr.responseText);
+          reject(new Error(errRes.error || `Gagal mengunggah berkas (${xhr.status})`));
+        } catch {
+          reject(new Error(`Gagal mengunggah berkas dengan kode status ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
+    };
+
+    xhr.send(formData);
+  });
+}
+

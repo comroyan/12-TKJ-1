@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, auth, storage } from "../firebase/config";
-import { renderIcons, toast, formatShortDate, confirmDialog, getApiUrl } from "../utils/helpers";
+import { renderIcons, toast, formatShortDate, confirmDialog, getApiUrl, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 // Topics for Materials & Bank Soal
@@ -647,9 +647,8 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
 
             try {
               if (file) {
-                const storageRef = ref(storage, `materials/${Date.now()}_${file.name}`);
-                const snap = await uploadBytes(storageRef, file);
-                fileUrl = await getDownloadURL(snap.ref);
+                const uploadResult = await uploadFileToServer(file);
+                fileUrl = uploadResult.fileUrl;
               }
 
               if (!fileUrl) {
