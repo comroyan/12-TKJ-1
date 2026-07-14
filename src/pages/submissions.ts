@@ -1,6 +1,8 @@
 import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask } from "../firebase/db";
 import { renderIcons, formatDate, toast, confirmDialog, getApiUrl } from "../utils/helpers";
 import Swal from "sweetalert2";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../firebase/config";
 
 export async function renderSubmissions(container: HTMLElement, userSession: any) {
   container.innerHTML = `
@@ -543,46 +545,71 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
 
         let fileUrl = "";
         
-        // Try direct browser-to-Catbox upload first to offload the server and bypass cold starts
+        // 1. Try Firebase Storage directly (most reliable, bypasses Express cold-starts and CORS limits)
         try {
-          console.log("Mencoba unggah cloud langsung dari browser...");
-          const catboxForm = new FormData();
-          catboxForm.append("reqtype", "fileupload");
-          catboxForm.append("fileToUpload", selectedFile);
-
-          const directRes = await fetch("https://catbox.moe/user/api.php", {
-            method: "POST",
-            body: catboxForm,
-          });
-
-          if (directRes.ok) {
-            const textResult = await directRes.text();
-            if (textResult && textResult.trim().startsWith("http")) {
-              fileUrl = textResult.trim();
-              console.log("Browser direct upload successful:", fileUrl);
-            }
-          }
-        } catch (directErr) {
-          console.warn("Direct upload gagal atau diblokir CORS, beralih ke server upload:", directErr);
+          console.log("Mencoba unggah langsung ke Firebase Storage...");
+          const safeName = `${Date.now()}-${selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+          const storageRef = ref(storage, `submissions/${userSession.uid}/${safeName}`);
+          const snapshot = await uploadBytes(storageRef, selectedFile);
+          fileUrl = await getDownloadURL(snapshot.ref);
+          console.log("Direct Firebase Storage upload successful:", fileUrl);
+        } catch (firebaseErr) {
+          console.warn("Direct Firebase Storage upload failed, trying Express API fallback:", firebaseErr);
         }
 
-        // Fallback to Express backend upload if direct upload didn't succeed
+        // 2. Fallback to Express backend upload if direct Firebase Storage failed
         if (!fileUrl) {
-          const formData = new FormData();
-          formData.append("file", selectedFile);
+          try {
+            console.log("Mencoba unggah ke server Express...");
+            const formData = new FormData();
+            formData.append("file", selectedFile);
 
-          const uploadRes = await fetch(getApiUrl("/api/upload"), {
-            method: "POST",
-            body: formData,
-          });
+            const uploadRes = await fetch(getApiUrl("/api/upload"), {
+              method: "POST",
+              body: formData,
+            });
 
-          if (!uploadRes.ok) {
-            const errData = await uploadRes.json();
-            throw new Error(errData.error || "Gagal mengunggah berkas ke server.");
+            if (uploadRes.ok) {
+              const uploadData = await uploadRes.json();
+              fileUrl = uploadData.fileUrl;
+              console.log("Express API upload successful:", fileUrl);
+            } else {
+              const errData = await uploadRes.json().catch(() => ({}));
+              console.warn("Express API upload failed:", errData.error || "Unknown error");
+            }
+          } catch (expressErr) {
+            console.warn("Express API upload fetch failed:", expressErr);
           }
+        }
 
-          const uploadData = await uploadRes.json();
-          fileUrl = uploadData.fileUrl;
+        // 3. Emergency last-resort: Try direct browser-to-Catbox upload
+        if (!fileUrl) {
+          try {
+            console.log("Mencoba unggah darurat ke Catbox...");
+            const catboxForm = new FormData();
+            catboxForm.append("reqtype", "fileupload");
+            catboxForm.append("fileToUpload", selectedFile);
+
+            const directRes = await fetch("https://catbox.moe/user/api.php", {
+              method: "POST",
+              body: catboxForm,
+            });
+
+            if (directRes.ok) {
+              const textResult = await directRes.text();
+              if (textResult && textResult.trim().startsWith("http")) {
+                fileUrl = textResult.trim();
+                console.log("Catbox direct upload successful:", fileUrl);
+              }
+            }
+          } catch (catboxErr) {
+            console.warn("Catbox emergency upload failed:", catboxErr);
+          }
+        }
+
+        // 4. Ensure we have a valid URL
+        if (!fileUrl) {
+          throw new Error("Semua metode unggah gagal. Silakan coba lagi atau gunakan ukuran berkas yang lebih kecil.");
         }
 
         // Fast-forward to 100% on success
