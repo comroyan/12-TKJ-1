@@ -523,48 +523,75 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       uploadProgressContainer.classList.remove("hidden");
 
       let progress = 0;
-      const interval = setInterval(async () => {
-        progress += Math.floor(Math.random() * 20) + 10;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-          
-          progressBar.style.width = "100%";
-          progressPercentage.textContent = "100%";
+      progressBar.style.width = "0%";
+      progressPercentage.textContent = "0%";
 
-          try {
-            // Generate simulated secure hosting URL matching the file name
-            const simulatedId = Math.random().toString(36).substring(2, 10);
-            const fileUrl = `https://classhub-storage.local/uploads/tasks/${simulatedId}/${selectedFile?.name}`;
-
-            const submissionPayload = {
-              taskId,
-              taskTitle,
-              subject,
-              userId: userSession.uid,
-              userName: userSession.name,
-              absen: userSession.absen || 0,
-              fileName: selectedFile?.name,
-              fileUrl,
-              status: "Menunggu Pemeriksaan",
-              feedback: "",
-              taskType,
-              members
-            };
-
-            await addSubmission(submissionPayload);
-            toast.success("Tugas Anda berhasil diunggah!");
-            loadAndRender();
-          } catch (err: any) {
-            Swal.fire("Gagal Mengirim", err.message, "error");
-            submitSubBtn.disabled = false;
-            uploadProgressContainer.classList.add("hidden");
-          }
-        } else {
+      // Simulated smooth progress animation up to 90%
+      const interval = setInterval(() => {
+        if (progress < 90) {
+          progress += Math.floor(Math.random() * 15) + 5;
+          if (progress > 90) progress = 90;
           progressBar.style.width = progress + "%";
           progressPercentage.textContent = progress + "%";
         }
-      }, 300);
+      }, 150);
+
+      try {
+        if (!selectedFile) {
+          throw new Error("Berkas lampiran tidak ditemukan.");
+        }
+
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.error || "Gagal mengunggah berkas ke server.");
+        }
+
+        const uploadData = await uploadRes.json();
+
+        // Fast-forward to 100% on success
+        clearInterval(interval);
+        progressBar.style.width = "100%";
+        progressPercentage.textContent = "100%";
+
+        const submissionPayload = {
+          taskId,
+          taskTitle,
+          subject,
+          userId: userSession.uid,
+          userName: userSession.name,
+          absen: userSession.absen || 0,
+          fileName: selectedFile.name,
+          fileUrl: uploadData.fileUrl, // Real relative path like /uploads/filename.ext
+          status: "Menunggu Pemeriksaan",
+          feedback: "",
+          taskType,
+          members
+        };
+
+        await addSubmission(submissionPayload);
+        toast.success("Tugas Anda berhasil diunggah!");
+        
+        // Reset selected file in form
+        selectedFile = null;
+        fileInput.value = "";
+        selectedFileState.classList.add("hidden");
+        dropzoneContent.classList.remove("hidden");
+        
+        loadAndRender();
+      } catch (err: any) {
+        clearInterval(interval);
+        Swal.fire("Gagal Mengirim", err.message, "error");
+        submitSubBtn.disabled = false;
+        uploadProgressContainer.classList.add("hidden");
+      }
     });
 
     // Delete submission
@@ -769,9 +796,15 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
               <span class="text-xs font-semibold text-slate-200 mt-0.5 block">${s.taskTitle}</span>
             </td>
             <td class="py-4 px-6">
-              <div class="flex items-center gap-2 max-w-xs overflow-hidden">
+              <div class="flex items-center gap-2 max-w-xs overflow-hidden font-sans">
                 <i data-lucide="file-text" class="text-slate-400 w-3.5 h-3.5 shrink-0"></i>
-                <a href="${s.fileUrl}" target="_blank" class="text-xs text-cyan-400 hover:underline truncate" title="Unduh Berkas">${s.fileName}</a>
+                ${s.fileUrl && s.fileUrl.includes("classhub-storage.local") ? `
+                  <button class="text-xs text-slate-500 hover:text-slate-400 line-through truncate cursor-pointer text-left simulated-file-btn" data-filename="${s.fileName || 'berkas'}">
+                    ${s.fileName || 'Berkas Uji Coba'} <span class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono ml-1 shrink-0">Simulasi</span>
+                  </button>
+                ` : `
+                  <a href="${s.fileUrl}" target="_blank" class="text-xs text-cyan-400 hover:underline truncate" title="Unduh Berkas">${s.fileName || 'Lihat Berkas'}</a>
+                `}
               </div>
             </td>
             <td class="py-4 px-6">
@@ -797,6 +830,21 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       }).join("");
 
       renderIcons();
+
+      // Attach simulated file click warnings
+      document.querySelectorAll(".simulated-file-btn").forEach((btn: any) => {
+        btn.addEventListener("click", () => {
+          Swal.fire({
+            title: "Berkas Simulasi",
+            text: `Berkas "${btn.dataset.filename}" adalah data contoh (simulasi) dari sistem lama sebelum fitur upload aktif. Harap minta siswa bersangkutan untuk mengunggah ulang tugas aslinya.`,
+            icon: "info",
+            background: "#0f172a",
+            color: "#f8fafc",
+            confirmButtonText: "Mengerti",
+            confirmButtonColor: "#334155"
+          });
+        });
+      });
 
       // Attach Actions
       document.querySelectorAll(".reviewBtn").forEach((btn: any) => {

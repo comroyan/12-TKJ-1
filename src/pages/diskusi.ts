@@ -16,7 +16,20 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { renderIcons, toast, formatDate } from "../utils/helpers";
 import Swal from "sweetalert2";
 
+// Elevated to file/module level to prevent duplicate snapshot memory leak on route changes
+let globalUnsubscribeMessages: (() => void) | null = null;
+
 export function renderDiskusi(container: HTMLElement, userSession: any) {
+  // Unsubscribe from any previous instance's listener to prevent stacking multiple active Firestore streams
+  if (globalUnsubscribeMessages) {
+    try {
+      globalUnsubscribeMessages();
+    } catch (e) {
+      console.warn("Gagal membersihkan listener diskusi lama:", e);
+    }
+    globalUnsubscribeMessages = null;
+  }
+
   let activeChannel = "umum";
 
   const channels = [
@@ -98,8 +111,6 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
   const activeChannelDesc = document.getElementById("activeChannelDesc") as HTMLElement;
   const chatMessagePanel = document.getElementById("chatMessagePanel") as HTMLElement;
   const chatInputArea = document.getElementById("chatInputArea") as HTMLElement;
-
-  let unsubscribeMessages: (() => void) | null = null;
 
   // Render Channel List sidebar
   function renderChannels() {
@@ -320,8 +331,8 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
   // Set up live Snapshot Listener for messages
   function setupMessagesListener() {
     // Unsubscribe previous channel listener
-    if (unsubscribeMessages) {
-      unsubscribeMessages();
+    if (globalUnsubscribeMessages) {
+      globalUnsubscribeMessages();
     }
 
     const messagesQuery = query(
@@ -330,7 +341,7 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
       limit(80)
     );
 
-    unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+    globalUnsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
       const docs = snapshot.docs;
       
       if (docs.length === 0) {
@@ -567,8 +578,8 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
 
   // Destroy listener on unmount
   container.addEventListener("DOMNodeRemovedFromDocument", () => {
-    if (unsubscribeMessages) {
-      unsubscribeMessages();
+    if (globalUnsubscribeMessages) {
+      globalUnsubscribeMessages();
     }
   });
 }

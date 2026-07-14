@@ -2,6 +2,8 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import multer from "multer";
+import fs from "fs";
 
 dotenv.config();
 
@@ -10,6 +12,94 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Setup local uploads storage directory
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Configure Multer storage
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      const ext = path.extname(file.originalname);
+      // Clean up the original name to be safe
+      const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, "_");
+      cb(null, `${baseName}-${uniqueSuffix}${ext}`);
+    },
+  });
+
+  const upload = multer({
+    storage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // Max 50MB
+  });
+
+  // Serve uploaded files statically at /uploads
+  app.use("/uploads", express.static(uploadsDir));
+
+  // API Route: File Upload
+  app.post("/api/upload", upload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Tidak ada file yang diunggah" });
+      }
+      
+      // Default fallback path on the local server
+      let fileUrl = `/uploads/${req.file.filename}`;
+      let uploadedToCloud = false;
+
+      try {
+        console.log("Mencoba mengunggah ke Catbox Cloud...");
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const blob = new Blob([fileBuffer], { type: req.file.mimetype });
+        
+        const catboxForm = new FormData();
+        catboxForm.append("reqtype", "fileupload");
+        catboxForm.append("fileToUpload", blob, req.file.originalname);
+
+        const response = await fetch("https://catbox.moe/user/api.php", {
+          method: "POST",
+          body: catboxForm,
+        });
+
+        if (response.ok) {
+          const resultText = await response.text();
+          if (resultText && resultText.trim().startsWith("http")) {
+            fileUrl = resultText.trim();
+            uploadedToCloud = true;
+            console.log("Unggah Cloud Berhasil:", fileUrl);
+            
+            // Delete the local file to save disk space on stateless Cloud Run container
+            try {
+              fs.unlinkSync(req.file.path);
+            } catch (unlinkErr) {
+              console.warn("Gagal menghapus cache berkas lokal:", unlinkErr);
+            }
+          } else {
+            console.warn("Respon Catbox tidak valid:", resultText);
+          }
+        } else {
+          console.warn("Catbox menolak unggahan, status:", response.status);
+        }
+      } catch (cloudErr) {
+        console.error("Gagal mengunggah ke Cloud, beralih ke penyimpanan lokal cadangan:", cloudErr);
+      }
+
+      res.json({ 
+        success: true, 
+        fileUrl, 
+        fileName: req.file.originalname,
+        storage: uploadedToCloud ? "cloud" : "local"
+      });
+    } catch (error: any) {
+      console.error("Upload Error:", error);
+      res.status(500).json({ error: error.message || "Gagal mengunggah berkas" });
+    }
+  });
 
   // API Route: AI Assistant
   app.post("/api/ai", async (req, res) => {
