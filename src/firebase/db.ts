@@ -17,6 +17,53 @@ import {
 } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "./config";
 
+// --- CACHING ENGINE TO PREVENT LAG UNDER HEAVY LOAD OR POOR CONCURRENCY ---
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const MEMORY_CACHE: { [key: string]: CacheEntry } = {};
+// 20 seconds TTL is highly effective to prevent duplicate calls during navigation 
+// and reduce active reads, while maintaining up-to-date real-time state.
+const DEFAULT_TTL_MS = 20 * 1000; 
+
+export function invalidateCache(prefix?: string) {
+  if (prefix) {
+    Object.keys(MEMORY_CACHE).forEach(key => {
+      if (key === prefix || key.startsWith(prefix + "_") || key.startsWith(prefix + "/")) {
+        delete MEMORY_CACHE[key];
+      }
+    });
+  } else {
+    Object.keys(MEMORY_CACHE).forEach(key => delete MEMORY_CACHE[key]);
+  }
+}
+
+async function fetchWithCache(key: string, fetchFn: () => Promise<any>, ttl: number = DEFAULT_TTL_MS): Promise<any> {
+  const now = Date.now();
+  const cached = MEMORY_CACHE[key];
+  if (cached && (now - cached.timestamp < ttl)) {
+    return cached.data;
+  }
+  try {
+    const freshData = await fetchFn();
+    MEMORY_CACHE[key] = {
+      data: freshData,
+      timestamp: now
+    };
+    return freshData;
+  } catch (error) {
+    console.error(`Cache fetch failed for key: ${key}`, error);
+    // If we have a stale cached version, return it even if it's expired! This prevents offline crash/lag.
+    if (cached) {
+      console.log(`Returning stale cached version for key: ${key}`);
+      return cached.data;
+    }
+    throw error;
+  }
+}
+
 // --- AUDIT LOGS ---
 export async function writeAuditLog(action: string, details: string) {
   try {
@@ -54,6 +101,7 @@ export async function createStudentUser(uid: string, data: any) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    invalidateCache("users");
     await writeAuditLog("Create Member", `Membuat akun siswa: ${data.name} (Absen ${data.absen})`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -67,6 +115,7 @@ export async function updateStudentUser(uid: string, data: any) {
       ...data,
       updatedAt: serverTimestamp()
     });
+    invalidateCache("users");
     await writeAuditLog("Update Member", `Memperbarui profil siswa UID: ${uid}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -77,6 +126,7 @@ export async function deleteStudentUser(uid: string, name: string) {
   const path = `users/${uid}`;
   try {
     await deleteDoc(doc(db, "users", uid));
+    invalidateCache("users");
     await writeAuditLog("Delete Member", `Menghapus akun siswa: ${name}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -85,32 +135,27 @@ export async function deleteStudentUser(uid: string, name: string) {
 
 export async function getStudentUsers() {
   const path = "users";
-  try {
+  return fetchWithCache("users", async () => {
     const q = query(collection(db, path), orderBy("absen", "asc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 // --- LESSON SCHEDULES ---
 export async function getSchedules() {
   const path = "schedules";
-  try {
+  return fetchWithCache("schedules", async () => {
     const snap = await getDocs(collection(db, path));
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function saveSchedule(id: string, data: any) {
   const path = `schedules/${id}`;
   try {
     await setDoc(doc(db, "schedules", id), data);
+    invalidateCache("schedules");
     await writeAuditLog("Save Schedule", `Menyimpan jadwal pelajaran hari: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -120,19 +165,17 @@ export async function saveSchedule(id: string, data: any) {
 // --- CLEANING SHIFTS (PICKETS) ---
 export async function getPickets() {
   const path = "pickets";
-  try {
+  return fetchWithCache("pickets", async () => {
     const snap = await getDocs(collection(db, path));
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function savePicket(id: string, data: any) {
   const path = `pickets/${id}`;
   try {
     await setDoc(doc(db, "pickets", id), data);
+    invalidateCache("pickets");
     await writeAuditLog("Save Picket", `Menyimpan jadwal piket hari: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -142,14 +185,11 @@ export async function savePicket(id: string, data: any) {
 // --- CLASS FUND (UANG KAS) ---
 export async function getClassFunds() {
   const path = "classFund";
-  try {
+  return fetchWithCache("classFund", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addClassFundEntry(data: any) {
@@ -159,6 +199,7 @@ export async function addClassFundEntry(data: any) {
       ...data,
       date: data.date || serverTimestamp()
     });
+    invalidateCache("classFund");
     await writeAuditLog("Class Fund Entry", `Transaksi Kas Baru: Rp${data.amount} (${data.type}) oleh ${data.studentName || "Siswa"}`);
     return docRef.id;
   } catch (error) {
@@ -173,6 +214,7 @@ export async function updateClassFundStatus(id: string, status: string, approved
       status,
       updatedBy: approvedBy
     });
+    invalidateCache("classFund");
     await writeAuditLog("Class Fund Verify", `Konfirmasi status kas ID ${id} menjadi ${status}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -183,6 +225,7 @@ export async function deleteClassFundEntry(id: string) {
   const path = `classFund/${id}`;
   try {
     await deleteDoc(doc(db, "classFund", id));
+    invalidateCache("classFund");
     await writeAuditLog("Delete Class Fund", `Menghapus entri kas ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -192,14 +235,11 @@ export async function deleteClassFundEntry(id: string) {
 // --- EVENT FUNDS (KEUANGAN ACARA) ---
 export async function getEventFunds() {
   const path = "eventFunds";
-  try {
+  return fetchWithCache("eventFunds", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addEventFundEntry(data: any) {
@@ -209,6 +249,7 @@ export async function addEventFundEntry(data: any) {
       ...data,
       date: serverTimestamp()
     });
+    invalidateCache("eventFunds");
     await writeAuditLog("Event Fund Entry", `Transaksi Acara ${data.eventName}: Rp${data.amount} oleh ${data.studentName}`);
     return docRef.id;
   } catch (error) {
@@ -220,6 +261,7 @@ export async function updateEventFundStatus(id: string, status: string) {
   const path = `eventFunds/${id}`;
   try {
     await updateDoc(doc(db, "eventFunds", id), { status });
+    invalidateCache("eventFunds");
     await writeAuditLog("Event Fund Verify", `Verifikasi status kas Acara ID ${id} menjadi ${status}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -230,6 +272,7 @@ export async function deleteEventFundEntry(id: string) {
   const path = `eventFunds/${id}`;
   try {
     await deleteDoc(doc(db, "eventFunds", id));
+    invalidateCache("eventFunds");
     await writeAuditLog("Delete Event Fund", `Menghapus entri dana acara ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -239,14 +282,11 @@ export async function deleteEventFundEntry(id: string) {
 // --- ANNOUNCEMENTS ---
 export async function getAnnouncements() {
   const path = "announcements";
-  try {
+  return fetchWithCache("announcements", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addAnnouncement(data: any) {
@@ -256,6 +296,7 @@ export async function addAnnouncement(data: any) {
       ...data,
       date: serverTimestamp()
     });
+    invalidateCache("announcements");
     await writeAuditLog("Announcement Created", `Pengumuman baru dibuat: ${data.title}`);
     return docRef.id;
   } catch (error) {
@@ -267,6 +308,7 @@ export async function deleteAnnouncement(id: string) {
   const path = `announcements/${id}`;
   try {
     await deleteDoc(doc(db, "announcements", id));
+    invalidateCache("announcements");
     await writeAuditLog("Announcement Deleted", `Menghapus pengumuman ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -276,20 +318,18 @@ export async function deleteAnnouncement(id: string) {
 // --- AGENDA & CALENDAR ---
 export async function getAgendas() {
   const path = "agenda";
-  try {
+  return fetchWithCache("agenda", async () => {
     const q = query(collection(db, path), orderBy("date", "asc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addAgendaItem(data: any) {
   const path = "agenda";
   try {
     const docRef = await addDoc(collection(db, path), data);
+    invalidateCache("agenda");
     await writeAuditLog("Agenda Created", `Agenda baru dibuat: ${data.title}`);
     return docRef.id;
   } catch (error) {
@@ -301,6 +341,7 @@ export async function deleteAgendaItem(id: string) {
   const path = `agenda/${id}`;
   try {
     await deleteDoc(doc(db, "agenda", id));
+    invalidateCache("agenda");
     await writeAuditLog("Agenda Deleted", `Menghapus agenda ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -310,20 +351,18 @@ export async function deleteAgendaItem(id: string) {
 // --- TASKS (TUGAS BERSAMA) ---
 export async function getTasks() {
   const path = "tasks";
-  try {
+  return fetchWithCache("tasks", async () => {
     const q = query(collection(db, path), orderBy("deadline", "asc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addTask(data: any) {
   const path = "tasks";
   try {
     const docRef = await addDoc(collection(db, path), data);
+    invalidateCache("tasks");
     await writeAuditLog("Task Created", `Tugas baru dibuat: ${data.subject}`);
     return docRef.id;
   } catch (error) {
@@ -335,6 +374,7 @@ export async function updateTaskStatus(id: string, status: string) {
   const path = `tasks/${id}`;
   try {
     await updateDoc(doc(db, "tasks", id), { status });
+    invalidateCache("tasks");
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -344,6 +384,7 @@ export async function deleteTask(id: string) {
   const path = `tasks/${id}`;
   try {
     await deleteDoc(doc(db, "tasks", id));
+    invalidateCache("tasks");
     await writeAuditLog("Task Deleted", `Menghapus tugas ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -353,14 +394,11 @@ export async function deleteTask(id: string) {
 // --- VOTING (POLLS) ---
 export async function getPolls() {
   const path = "polls";
-  try {
+  return fetchWithCache("polls", async () => {
     const q = query(collection(db, path), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function createPoll(data: any) {
@@ -370,6 +408,7 @@ export async function createPoll(data: any) {
       ...data,
       createdAt: serverTimestamp()
     });
+    invalidateCache("polls");
     await writeAuditLog("Poll Created", `Voting kelas baru dibuat: ${data.question}`);
     return docRef.id;
   } catch (error) {
@@ -397,6 +436,7 @@ export async function submitVote(pollId: string, optionIndex: number, userId: st
     });
 
     await updateDoc(pollDoc, { options });
+    invalidateCache("polls");
     await writeAuditLog("Vote Submitted", `Siswa memberikan suara pada voting: ${pollData.question}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -407,6 +447,7 @@ export async function closePoll(pollId: string, status: string) {
   const path = `polls/${pollId}`;
   try {
     await updateDoc(doc(db, "polls", pollId), { status });
+    invalidateCache("polls");
     await writeAuditLog("Poll Closed", `Voting ID ${pollId} ditutup/diselesaikan`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -417,6 +458,7 @@ export async function deletePoll(pollId: string) {
   const path = `polls/${pollId}`;
   try {
     await deleteDoc(doc(db, "polls", pollId));
+    invalidateCache("polls");
     await writeAuditLog("Poll Deleted", `Menghapus voting ID: ${pollId}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -426,14 +468,11 @@ export async function deletePoll(pollId: string) {
 // --- GALLERY ---
 export async function getGallery() {
   const path = "gallery";
-  try {
+  return fetchWithCache("gallery", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addGalleryPhoto(data: any) {
@@ -443,6 +482,7 @@ export async function addGalleryPhoto(data: any) {
       ...data,
       date: serverTimestamp()
     });
+    invalidateCache("gallery");
     await writeAuditLog("Gallery Uploaded", `Mengunggah foto kegiatan: ${data.title}`);
     return docRef.id;
   } catch (error) {
@@ -454,6 +494,7 @@ export async function deleteGalleryPhoto(id: string) {
   const path = `gallery/${id}`;
   try {
     await deleteDoc(doc(db, "gallery", id));
+    invalidateCache("gallery");
     await writeAuditLog("Gallery Photo Deleted", `Menghapus foto galeri ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -463,14 +504,11 @@ export async function deleteGalleryPhoto(id: string) {
 // --- SHARED FILES ---
 export async function getSharedFiles() {
   const path = "files";
-  try {
+  return fetchWithCache("files", async () => {
     const q = query(collection(db, path), orderBy("uploadDate", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addSharedFile(data: any) {
@@ -480,6 +518,7 @@ export async function addSharedFile(data: any) {
       ...data,
       uploadDate: serverTimestamp()
     });
+    invalidateCache("files");
     await writeAuditLog("File Shared", `Membagikan file/tautan: ${data.name}`);
     return docRef.id;
   } catch (error) {
@@ -491,6 +530,7 @@ export async function deleteSharedFile(id: string) {
   const path = `files/${id}`;
   try {
     await deleteDoc(doc(db, "files", id));
+    invalidateCache("files");
     await writeAuditLog("File Deleted", `Menghapus file bersama ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -500,14 +540,11 @@ export async function deleteSharedFile(id: string) {
 // --- MEETINGS & MINUTES ---
 export async function getMeetings() {
   const path = "meetings";
-  try {
+  return fetchWithCache("meetings", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addMeeting(data: any) {
@@ -517,6 +554,7 @@ export async function addMeeting(data: any) {
       ...data,
       createdAt: serverTimestamp()
     });
+    invalidateCache("meetings");
     await writeAuditLog("Meeting Created", `Catatan rapat baru: ${data.title}`);
     return docRef.id;
   } catch (error) {
@@ -528,6 +566,7 @@ export async function deleteMeeting(id: string) {
   const path = `meetings/${id}`;
   try {
     await deleteDoc(doc(db, "meetings", id));
+    invalidateCache("meetings");
     await writeAuditLog("Meeting Deleted", `Menghapus catatan rapat ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -537,19 +576,17 @@ export async function deleteMeeting(id: string) {
 // --- EQUIPMENT / INVENTORY (INVENTARIS) ---
 export async function getInventory() {
   const path = "inventory";
-  try {
+  return fetchWithCache("inventory", async () => {
     const snap = await getDocs(collection(db, path));
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addInventoryItem(data: any) {
   const path = "inventory";
   try {
     const docRef = await addDoc(collection(db, path), data);
+    invalidateCache("inventory");
     await writeAuditLog("Inventory Added", `Menambah barang inventaris: ${data.name}`);
     return docRef.id;
   } catch (error) {
@@ -561,6 +598,7 @@ export async function updateInventoryItem(id: string, data: any) {
   const path = `inventory/${id}`;
   try {
     await updateDoc(doc(db, "inventory", id), data);
+    invalidateCache("inventory");
     await writeAuditLog("Inventory Updated", `Memperbarui status barang ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -571,6 +609,7 @@ export async function deleteInventoryItem(id: string) {
   const path = `inventory/${id}`;
   try {
     await deleteDoc(doc(db, "inventory", id));
+    invalidateCache("inventory");
     await writeAuditLog("Inventory Deleted", `Menghapus barang inventaris ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -580,19 +619,17 @@ export async function deleteInventoryItem(id: string) {
 // --- CONTACTS ---
 export async function getContacts() {
   const path = "contacts";
-  try {
+  return fetchWithCache("contacts", async () => {
     const snap = await getDocs(collection(db, path));
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addContact(data: any) {
   const path = "contacts";
   try {
     const docRef = await addDoc(collection(db, path), data);
+    invalidateCache("contacts");
     await writeAuditLog("Contact Added", `Menambah kontak penting: ${data.name}`);
     return docRef.id;
   } catch (error) {
@@ -604,6 +641,7 @@ export async function deleteContact(id: string) {
   const path = `contacts/${id}`;
   try {
     await deleteDoc(doc(db, "contacts", id));
+    invalidateCache("contacts");
     await writeAuditLog("Contact Deleted", `Menghapus kontak ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -613,14 +651,11 @@ export async function deleteContact(id: string) {
 // --- NOTIFICATIONS ---
 export async function getNotifications() {
   const path = "notifications";
-  try {
+  return fetchWithCache("notifications", async () => {
     const q = query(collection(db, path), orderBy("date", "desc"), limit(30));
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function createNotification(title: string, content: string, type: string) {
@@ -633,6 +668,7 @@ export async function createNotification(title: string, content: string, type: s
       date: serverTimestamp(),
       readBy: []
     });
+    invalidateCache("notifications");
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -648,6 +684,7 @@ export async function markNotificationRead(id: string, userId: string) {
     if (!readBy.includes(userId)) {
       readBy.push(userId);
       await updateDoc(docRef, { readBy });
+      invalidateCache("notifications");
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -657,7 +694,7 @@ export async function markNotificationRead(id: string, userId: string) {
 // --- SYSTEM SETTINGS ---
 export async function getSystemSettings() {
   const path = "settings";
-  try {
+  return fetchWithCache("settings", async () => {
     const docRef = doc(db, path, "classhub_config");
     const snap = await getDoc(docRef);
     if (snap.exists()) {
@@ -677,16 +714,14 @@ export async function getSystemSettings() {
       }
       return defaultSettings;
     }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return null;
-  }
+  });
 }
 
 export async function updateSystemSettings(data: any) {
   const path = "settings/classhub_config";
   try {
     await setDoc(doc(db, "settings", "classhub_config"), data, { merge: true });
+    invalidateCache("settings");
     await writeAuditLog("Settings Changed", "Memperbarui konfigurasi ClassHub utama");
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -749,7 +784,7 @@ export async function toggleMessageReaction(messageId: string, emoji: string, us
 // --- SUBMISSIONS (PENGUMPULAN TUGAS SISWA) ---
 export async function getSubmissions() {
   const path = "submissions";
-  try {
+  return fetchWithCache("submissions_all", async () => {
     const q = query(collection(db, path));
     const snap = await getDocs(q);
     const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -759,15 +794,12 @@ export async function getSubmissions() {
       return tB - tA;
     });
     return docs;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function getTaskSubmissions(taskId: string) {
   const path = "submissions";
-  try {
+  return fetchWithCache(`submissions_task_${taskId}`, async () => {
     const q = query(collection(db, path), where("taskId", "==", taskId));
     const snap = await getDocs(q);
     const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -777,15 +809,12 @@ export async function getTaskSubmissions(taskId: string) {
       return tB - tA;
     });
     return docs;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function getMySubmissions(userId: string) {
   const path = "submissions";
-  try {
+  return fetchWithCache(`submissions_user_${userId}`, async () => {
     const q = query(collection(db, path), where("userId", "==", userId));
     const snap = await getDocs(q);
     const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -795,10 +824,7 @@ export async function getMySubmissions(userId: string) {
       return tB - tA;
     });
     return docs;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return [];
-  }
+  });
 }
 
 export async function addSubmission(data: any) {
@@ -808,6 +834,7 @@ export async function addSubmission(data: any) {
       ...data,
       submittedAt: serverTimestamp()
     });
+    invalidateCache("submissions");
     await writeAuditLog("Submission Uploaded", `Siswa ${data.userName} mengumpulkan tugas ${data.taskTitle}`);
     return docRef.id;
   } catch (error) {
@@ -823,6 +850,7 @@ export async function updateSubmissionFeedback(id: string, status: string, feedb
       feedback,
       updatedAt: serverTimestamp()
     });
+    invalidateCache("submissions");
     await writeAuditLog("Submission Evaluated", `Menilai/Konfirmasi pengumpulan tugas ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -833,6 +861,7 @@ export async function deleteSubmission(id: string) {
   const path = `submissions/${id}`;
   try {
     await deleteDoc(doc(db, "submissions", id));
+    invalidateCache("submissions");
     await writeAuditLog("Submission Deleted", `Menghapus pengumpulan tugas ID: ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -841,22 +870,24 @@ export async function deleteSubmission(id: string) {
 
 // --- COUNTDOWN SETTINGS ---
 export async function getCountdownSettings() {
-  try {
-    const docRef = doc(db, "settings", "countdowns");
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return docSnap.data();
+  return fetchWithCache("countdowns", async () => {
+    try {
+      const docRef = doc(db, "settings", "countdowns");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data();
+      }
+    } catch (error) {
+      console.error("Gagal mengambil pengaturan countdown:", error);
     }
-  } catch (error) {
-    console.error("Gagal mengambil pengaturan countdown:", error);
-  }
-  // Return defaults if not set in Firestore
-  return {
-    graduation: "2027-05-15T08:00:00",
-    ukk: "2027-02-20T08:00:00",
-    pkl: "2026-09-01T08:00:00",
-    perpisahan: "2027-05-20T10:00:00"
-  };
+    // Return defaults if not set in Firestore
+    return {
+      graduation: "2027-05-15T08:00:00",
+      ukk: "2027-02-20T08:00:00",
+      pkl: "2026-09-01T08:00:00",
+      perpisahan: "2027-05-20T10:00:00"
+    };
+  });
 }
 
 export async function saveCountdownSettings(data: any) {
@@ -866,6 +897,7 @@ export async function saveCountdownSettings(data: any) {
       ...data,
       updatedAt: serverTimestamp()
     });
+    invalidateCache("countdowns");
     await writeAuditLog("Save Countdowns", "Memperbarui konfigurasi target countdown dashboard");
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
