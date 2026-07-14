@@ -72,10 +72,19 @@ async function startServer() {
         catboxForm.append("reqtype", "fileupload");
         catboxForm.append("fileToUpload", blob, req.file.originalname);
 
+        // AbortController timeout of 6 seconds
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.warn("Catbox upload request timed out after 6 seconds, aborting...");
+        }, 6000);
+
         const response = await fetch("https://catbox.moe/user/api.php", {
           method: "POST",
           body: catboxForm,
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const resultText = await response.text();
@@ -96,8 +105,12 @@ async function startServer() {
         } else {
           console.warn("Catbox menolak unggahan, status:", response.status);
         }
-      } catch (cloudErr) {
-        console.error("Gagal mengunggah ke Cloud, beralih ke penyimpanan lokal cadangan:", cloudErr);
+      } catch (cloudErr: any) {
+        if (cloudErr.name === "AbortError") {
+          console.error("Gagal mengunggah ke Cloud: Batas waktu habis (Timeout). Beralih ke penyimpanan lokal.");
+        } else {
+          console.error("Gagal mengunggah ke Cloud, beralih ke penyimpanan lokal cadangan:", cloudErr);
+        }
       }
 
       res.json({ 

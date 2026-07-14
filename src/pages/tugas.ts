@@ -106,7 +106,7 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
                     </div>
 
                     <div class="flex items-center gap-1">
-                      ${t.status === 'pending' ? `
+                      ${isEditor ? (t.status === 'pending' ? `
                         <button class="completeTaskBtn px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
                           ✓ Selesai
                         </button>
@@ -114,7 +114,7 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
                         <button class="pendingTaskBtn px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
                           Unmark
                         </button>
-                      `}
+                      `) : ""}
                       ${isEditor ? `
                         <button class="deleteTaskBtn p-2 bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 rounded-xl transition-colors" data-id="${t.id}">
                           <i data-lucide="trash2" class="w-3.5 h-3.5"></i>

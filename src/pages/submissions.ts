@@ -590,10 +590,15 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
             catboxForm.append("reqtype", "fileupload");
             catboxForm.append("fileToUpload", selectedFile);
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+
             const directRes = await fetch("https://catbox.moe/user/api.php", {
               method: "POST",
               body: catboxForm,
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             if (directRes.ok) {
               const textResult = await directRes.text();
@@ -603,7 +608,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
               }
             }
           } catch (catboxErr) {
-            console.warn("Catbox emergency upload failed:", catboxErr);
+            console.warn("Catbox emergency upload failed or timed out:", catboxErr);
           }
         }
 
