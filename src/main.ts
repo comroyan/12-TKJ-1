@@ -126,7 +126,18 @@ async function initializeApplet() {
       if (activeUserSession.mustChangePassword) {
         renderMustChangePasswordScreen();
       } else {
-        renderMainLayout();
+        const pageContent = document.getElementById("pageContent");
+        if (pageContent) {
+          // Update cached user session dynamically if layout is already rendered
+          const userNameEl = document.getElementById("sidebarUserName");
+          const userJabatanEl = document.getElementById("sidebarUserJabatan");
+          const userPhotoEl = document.getElementById("sidebarUserPhoto") as HTMLImageElement;
+          if (userNameEl) userNameEl.innerText = activeUserSession.name;
+          if (userJabatanEl) userJabatanEl.innerText = activeUserSession.jabatan;
+          if (userPhotoEl) userPhotoEl.src = activeUserSession.foto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=64&h=64&fit=crop';
+        } else {
+          renderMainLayout();
+        }
       }
     }
   });
@@ -138,9 +149,6 @@ async function initializeApplet() {
 function renderSetupScreen() {
   rootEl.innerHTML = `
     <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden font-sans">
-      <div class="absolute w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -top-12 -left-12"></div>
-      <div class="absolute w-80 h-80 bg-rose-500/10 rounded-full blur-3xl -bottom-12 -right-12"></div>
-      
       <div class="w-full max-w-lg glass p-8 rounded-3xl space-y-6 relative border border-slate-800 text-center">
         <div class="flex justify-center">
           <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
@@ -213,9 +221,6 @@ function renderSetupScreen() {
 function renderLoginScreen() {
   rootEl.innerHTML = `
     <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden font-sans">
-      <div class="absolute w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -top-12 -left-12"></div>
-      <div class="absolute w-80 h-80 bg-blue-500/5 rounded-full blur-3xl -bottom-12 -right-12"></div>
-
       <div class="w-full max-w-md glass p-8 rounded-3xl space-y-6 border border-slate-800 relative">
         <div class="text-center space-y-2">
           <div class="flex justify-center">
@@ -298,7 +303,6 @@ function renderLoginScreen() {
 function renderCompleteProfileScreen(user: any) {
   rootEl.innerHTML = `
     <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden font-sans">
-      <div class="absolute w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -top-12 -left-12"></div>
       <div class="w-full max-w-lg glass p-8 rounded-3xl space-y-6 border border-slate-800 relative">
         <div class="text-center space-y-2">
           <div class="flex justify-center">
@@ -415,7 +419,6 @@ function renderCompleteProfileScreen(user: any) {
 function renderMustChangePasswordScreen() {
   rootEl.innerHTML = `
     <div class="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden font-sans">
-      <div class="absolute w-80 h-80 bg-rose-500/10 rounded-full blur-3xl -top-12 -left-12"></div>
       <div class="w-full max-w-md glass p-8 rounded-3xl space-y-6 border border-slate-800 relative text-center">
         <div class="flex justify-center">
           <div class="w-16 h-16 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
@@ -490,9 +493,6 @@ async function renderMainLayout() {
 
   rootEl.innerHTML = `
     <div class="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col md:flex-row relative">
-      <!-- Background Ambient Blur -->
-      <div class="absolute w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-3xl -top-24 -left-24 pointer-events-none"></div>
-
       <!-- Mobile Top Navigation Bar -->
       <div class="md:hidden flex items-center justify-between px-6 py-4 glass border-b border-slate-850 z-50 w-full">
         <div class="flex items-center gap-3">
@@ -504,8 +504,8 @@ async function renderMainLayout() {
         </button>
       </div>
 
-      <!-- Sidebar -->
-      <aside id="sidebarPanel" class="w-72 glass border-r border-slate-850 p-6 flex flex-col justify-between hidden md:flex md:sticky md:top-0 md:h-screen z-40 transition-all duration-300">
+      <!-- Sidebar (Responsive Overlay for Mobile) -->
+      <aside id="sidebarPanel" class="w-72 glass border-r border-slate-850 p-6 flex flex-col justify-between fixed md:sticky inset-y-0 left-0 h-screen z-50 md:z-40 transition-all duration-300 hidden md:flex">
         <div class="space-y-6">
           <!-- Class Logo Header -->
           <div class="glass p-4 flex items-center gap-3 mb-2 border border-white/10">
@@ -580,10 +580,10 @@ async function renderMainLayout() {
         <!-- Quick Profile Logout Footer -->
         <div class="mt-6 pt-4 border-t border-slate-850 flex items-center justify-between gap-3">
           <div class="flex items-center gap-2.5 overflow-hidden">
-            <img src="${activeUserSession.foto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=64&h=64&fit=crop'}" class="w-8.5 h-8.5 rounded-xl object-cover border border-slate-800">
+            <img id="sidebarUserPhoto" src="${activeUserSession.foto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=64&h=64&fit=crop'}" class="w-8.5 h-8.5 rounded-xl object-cover border border-slate-800">
             <div class="overflow-hidden">
-              <span class="text-xs font-bold text-white block truncate leading-none">${activeUserSession.name}</span>
-              <span class="text-[9px] text-slate-500 block mt-0.5 truncate uppercase font-mono">${activeUserSession.jabatan}</span>
+              <span id="sidebarUserName" class="text-xs font-bold text-white block truncate leading-none">${activeUserSession.name}</span>
+              <span id="sidebarUserJabatan" class="text-[9px] text-slate-500 block mt-0.5 truncate uppercase font-mono">${activeUserSession.jabatan}</span>
             </div>
           </div>
           <button id="logoutBtn" class="p-2 bg-slate-900 border border-slate-850 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition-colors" title="Keluar">
@@ -593,7 +593,7 @@ async function renderMainLayout() {
       </aside>
 
       <!-- Content Container -->
-      <main class="flex-1 p-6 md:p-8 overflow-y-auto h-screen relative" id="pageContent">
+      <main class="flex-1 p-6 md:p-8 relative min-h-screen" id="pageContent">
         <!-- Render page dynamically -->
       </main>
     </div>
@@ -696,13 +696,21 @@ async function renderMainLayout() {
 
   // Mobile menu toggle
   if (mobileBurgerBtn) {
-    mobileBurgerBtn.addEventListener("click", () => {
+    mobileBurgerBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       sidebarPanel.classList.toggle("hidden");
-      if (!sidebarPanel.classList.contains("hidden")) {
-        sidebarPanel.className = "w-72 glass border-r border-slate-850 p-6 flex flex-col justify-between fixed inset-y-0 left-0 h-screen z-50 animate-fadeIn";
-      }
     });
   }
+
+  // Close mobile sidebar when clicking outside
+  document.addEventListener("click", (e) => {
+    if (window.innerWidth < 768) {
+      const target = e.target as HTMLElement;
+      if (!sidebarPanel.contains(target) && target !== mobileBurgerBtn && !mobileBurgerBtn.contains(target)) {
+        sidebarPanel.classList.add("hidden");
+      }
+    }
+  });
 
   // Logout listener
   document.getElementById("logoutBtn")?.addEventListener("click", async () => {

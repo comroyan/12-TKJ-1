@@ -412,8 +412,6 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
           <!-- 5. TAB: FOCUS TIMER (POMODORO) -->
           ${activeTab === 'pomodoro' ? `
             <div class="max-w-md mx-auto p-8 glass rounded-3xl text-center space-y-6 relative overflow-hidden">
-              <div class="absolute -right-12 -top-12 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl"></div>
-              
               <div>
                 <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${pomodoroMode === 'work' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}">
                   ${pomodoroMode === 'work' ? '🔴 Sesi Fokus' : '🟢 Waktu Istirahat'}

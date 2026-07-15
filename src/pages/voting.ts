@@ -1,7 +1,6 @@
 import { getPolls, createPoll, submitVote, closePoll, deletePoll } from "../firebase/db";
 import { renderIcons, toast, confirmDialog } from "../utils/helpers";
 import Swal from "sweetalert2";
-import Chart from "chart.js/auto";
 
 export async function renderVoting(container: HTMLElement, userSession: any) {
   container.innerHTML = `
@@ -94,10 +93,6 @@ export async function renderVoting(container: HTMLElement, userSession: any) {
                       </button>
                     ` : ""}
                   </div>
-
-                  <div class="w-28 h-28 hidden md:block">
-                    <canvas id="chart-${p.id}" class="pollChartCanvas"></canvas>
-                  </div>
                 </div>
               </div>
             `;
@@ -162,39 +157,7 @@ export async function renderVoting(container: HTMLElement, userSession: any) {
       });
     });
 
-    // Draw little dynamic charts per poll
-    polls.forEach((p: any) => {
-      const canvas = document.getElementById(`chart-${p.id}`) as HTMLCanvasElement;
-      if (canvas) {
-        const labels = p.options.map((o: any) => o.text.substring(0, 15) + (o.text.length > 15 ? "..." : ""));
-        const data = p.options.map((o: any) => o.votes?.length || 0);
 
-        new Chart(canvas, {
-          type: "doughnut",
-          data: {
-            labels,
-            datasets: [{
-              data,
-              backgroundColor: [
-                "rgba(6, 182, 212, 0.7)",
-                "rgba(16, 185, 129, 0.7)",
-                "rgba(245, 158, 11, 0.7)",
-                "rgba(239, 68, 68, 0.7)"
-              ],
-              borderWidth: 0
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { enabled: true }
-            }
-          }
-        });
-      }
-    });
 
     // Create Poll (Super Admin or Class Officer only)
     if (isEditor) {

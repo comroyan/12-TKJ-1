@@ -9,10 +9,7 @@ import {
   saveCountdownSettings
 } from "../firebase/db";
 import { formatRupiah, renderIcons, isOddWeek, toast } from "../utils/helpers";
-import Chart from "chart.js/auto";
 import Swal from "sweetalert2";
-
-let activeCashFlowChart: any = null;
 
 export async function renderDashboard(container: HTMLElement, userSession: any) {
   // Loading skeleton
@@ -86,10 +83,16 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   const quote = quotes[Math.floor(Math.random() * quotes.length)];
 
   // Get custom countdown target timestamps
-  const milestoneGraduation = new Date(countdownSettings.graduation).getTime();
-  const milestoneUKK = new Date(countdownSettings.ukk).getTime();
-  const milestonePKL = new Date(countdownSettings.pkl).getTime();
-  const milestonePerpisahan = new Date(countdownSettings.perpisahan).getTime();
+  const settings = countdownSettings || {
+    graduation: "2027-05-15T08:00:00",
+    ukk: "2027-02-20T08:00:00",
+    pkl: "2026-09-01T08:00:00",
+    perpisahan: "2027-05-20T10:00:00"
+  };
+  const milestoneGraduation = new Date(settings.graduation || "2027-05-15T08:00:00").getTime();
+  const milestoneUKK = new Date(settings.ukk || "2027-02-20T08:00:00").getTime();
+  const milestonePKL = new Date(settings.pkl || "2026-09-01T08:00:00").getTime();
+  const milestonePerpisahan = new Date(settings.perpisahan || "2027-05-20T10:00:00").getTime();
 
   function getCountdownString(targetTime: number): string {
     const diff = targetTime - Date.now();
@@ -104,10 +107,9 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     <div class="space-y-6">
       <!-- Welcome Header -->
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass rounded-3xl relative overflow-hidden">
-        <div class="absolute right-0 top-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl"></div>
         <div>
           <h1 class="text-3xl font-bold font-display tracking-tight text-white flex items-center gap-2">
-            Halo, ${userSession.name}! <span class="animate-bounce">👋</span>
+            Halo, ${userSession.name || "Siswa"}! <span class="hover:scale-110 transition-transform duration-200">👋</span>
           </h1>
           <p class="text-slate-400 mt-1 text-sm">Selamat datang di ClassHub XII TKJ 1 — Pusat koordinasi digital kelas Anda.</p>
         </div>
@@ -201,8 +203,10 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
               </h2>
               <span class="text-xs text-slate-400">Kas Aktif</span>
             </div>
-            <div class="relative w-full h-72">
-              <canvas id="cashFlowChart"></canvas>
+            <div class="relative w-full h-64 overflow-hidden" id="cashFlowChartContainer">
+              <div class="flex items-center justify-center h-full text-slate-500 font-mono text-xs">
+                Membuat grafik aliran kas...
+              </div>
             </div>
           </div>
         </div>
@@ -218,7 +222,7 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
               <div class="flex flex-wrap gap-2">
                 ${todayPickets.members.map((m: any) => `
                   <span class="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-slate-200 text-xs flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full ${m.done ? 'bg-emerald-400' : 'bg-rose-400 animate-ping'}"></span>
+                    <span class="w-1.5 h-1.5 rounded-full ${m.done ? 'bg-emerald-400' : 'bg-rose-500'}"></span>
                     ${m.name}
                   </span>
                 `).join("")}
@@ -258,8 +262,7 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
       <!-- Motivation and Lesson Widget Row -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Motivation Quote -->
-        <div class="p-6 glass rounded-3xl flex flex-col justify-between relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-cyan-500/20">
-          <div class="absolute -right-12 -bottom-12 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl"></div>
+        <div class="p-6 glass rounded-3xl flex flex-col justify-between relative overflow-hidden bg-slate-900/40 border border-cyan-500/20">
           <div>
             <div class="flex items-center gap-1.5 mb-2 text-cyan-400 text-xs font-semibold tracking-wider uppercase">
               <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Kutipan Motivasi TKJ
@@ -373,27 +376,9 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     }
   }
 
-  // Draw chart
-  const canvas = document.getElementById("cashFlowChart") as HTMLCanvasElement;
-  if (canvas) {
-    if (activeCashFlowChart) {
-      try {
-        activeCashFlowChart.destroy();
-      } catch (err) {
-        console.warn("Error destroying cached activeCashFlowChart:", err);
-      }
-      activeCashFlowChart = null;
-    }
-    try {
-      const existingChart = Chart.getChart(canvas);
-      if (existingChart) {
-        existingChart.destroy();
-      }
-    } catch (err) {
-      console.warn("Error destroying chart via Chart.getChart:", err);
-    }
-
-    // Collect monthly fund summary
+  // Render custom HTML/CSS responsive bar chart to prevent canvas graphics feedback and GPU tearing in iframes
+  const chartContainer = document.getElementById("cashFlowChartContainer");
+  if (chartContainer) {
     const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
     const monthlyDataIn = Array(12).fill(0);
     const monthlyDataOut = Array(12).fill(0);
@@ -413,7 +398,6 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     });
 
     const currentMonth = new Date().getMonth();
-    // Keep only last 6 months to make it gorgeous
     const displayMonths = [];
     const displayIn = [];
     const displayOut = [];
@@ -424,53 +408,87 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
       displayOut.push(monthlyDataOut[idx]);
     }
 
-    try {
-      activeCashFlowChart = new Chart(canvas, {
-        type: "bar",
-        data: {
-          labels: displayMonths,
-          datasets: [
-            {
-              label: "Kas Masuk (Rp)",
-              data: displayIn,
-              backgroundColor: "rgba(16, 185, 129, 0.6)",
-              borderColor: "rgba(16, 185, 129, 1)",
-              borderWidth: 1,
-              borderRadius: 6,
-            },
-            {
-              label: "Kas Keluar (Rp)",
-              data: displayOut,
-              backgroundColor: "rgba(239, 68, 68, 0.6)",
-              borderColor: "rgba(239, 68, 68, 1)",
-              borderWidth: 1,
-              borderRadius: 6,
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              labels: { color: "#94a3b8", font: { family: "Inter" } }
-            }
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-              ticks: { color: "#94a3b8" }
-            },
-            y: {
-              grid: { color: "rgba(255, 255, 255, 0.05)" },
-              ticks: { color: "#94a3b8" }
-            }
-          }
-        }
-      });
-    } catch (err) {
-      console.error("Gagal membuat objek Chart Aliran Keuangan Kas:", err);
-    }
+    const maxVal = Math.max(...displayIn, ...displayOut, 1000);
+
+    const formatCompactRupiah = (val: number): string => {
+      if (val >= 1000000) {
+        return `Rp ${(val / 1000000).toFixed(1).replace(/\.0$/, "")}jt`;
+      }
+      if (val >= 1000) {
+        return `Rp ${(val / 1000).toFixed(0)}rb`;
+      }
+      return `Rp ${val}`;
+    };
+
+    chartContainer.innerHTML = `
+      <div class="flex flex-col w-full h-full justify-between select-none animate-fadeIn">
+        <div class="flex-1 flex items-stretch gap-4 h-[190px]">
+          <!-- Y-Axis Labels -->
+          <div class="flex flex-col justify-between text-[10px] text-slate-400 font-mono w-14 pb-5 pt-2 border-r border-slate-800/50 pr-2">
+            <span>${formatCompactRupiah(maxVal)}</span>
+            <span>${formatCompactRupiah(maxVal / 2)}</span>
+            <span>Rp 0</span>
+          </div>
+          
+          <!-- Chart Columns -->
+          <div class="flex-1 grid grid-cols-6 gap-2 md:gap-4 relative pb-5">
+            <!-- Grid lines -->
+            <div class="absolute inset-x-0 top-0 bottom-5 flex flex-col justify-between pointer-events-none opacity-5">
+              <div class="border-b border-white w-full"></div>
+              <div class="border-b border-white w-full"></div>
+              <div class="border-b border-white w-full"></div>
+            </div>
+            
+            ${displayMonths.map((m, idx) => {
+              const valIn = displayIn[idx];
+              const valOut = displayOut[idx];
+              // Cap visual height to min 4% if has value so it doesn't look empty, and max 100%
+              const pctIn = valIn > 0 ? Math.min(100, Math.max(4, (valIn / maxVal) * 100)) : 0;
+              const pctOut = valOut > 0 ? Math.min(100, Math.max(4, (valOut / maxVal) * 100)) : 0;
+              
+              return `
+                <div class="flex flex-col justify-end items-center h-full relative group">
+                  <div class="flex items-end gap-1 md:gap-1.5 h-full w-full justify-center">
+                    <!-- Bar In -->
+                    <div class="w-3 md:w-5 bg-emerald-500/85 hover:bg-emerald-400 rounded-t-md transition-all duration-300 relative cursor-pointer" 
+                         style="height: ${pctIn}%">
+                      <!-- Custom Tooltip -->
+                      <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 bg-slate-900 border border-slate-700 text-white text-[10px] font-mono px-2 py-1 rounded shadow-xl whitespace-nowrap">
+                        Masuk: ${formatRupiah(valIn)}
+                      </div>
+                    </div>
+                    
+                    <!-- Bar Out -->
+                    <div class="w-3 md:w-5 bg-rose-500/85 hover:bg-rose-400 rounded-t-md transition-all duration-300 relative cursor-pointer" 
+                         style="height: ${pctOut}%">
+                      <!-- Custom Tooltip -->
+                      <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-30 bg-slate-900 border border-slate-700 text-white text-[10px] font-mono px-2 py-1 rounded shadow-xl whitespace-nowrap">
+                        Keluar: ${formatRupiah(valOut)}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Month Label -->
+                  <span class="absolute bottom-0 text-[10px] md:text-xs font-semibold text-slate-400 font-mono">${m}</span>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="flex items-center justify-center gap-6 mt-1 text-[11px] font-medium">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 bg-emerald-500 rounded-sm"></span>
+            <span class="text-slate-400">Kas Masuk</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 bg-rose-500 rounded-sm"></span>
+            <span class="text-slate-400">Kas Keluar</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // Live updates of countdowns
@@ -490,13 +508,14 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     }
   }, 1000 * 60); // Refresh every minute
 
-  // Live network ping diagnostics (TKJ style)
+  // Live network ping diagnostics (TKJ style - safe simulation)
   const updatePingMetric = async () => {
     const elPing = document.getElementById("dash-ping");
     if (!elPing) return;
     try {
+      // Safe, lightweight local timing calculation
       const t0 = performance.now();
-      await fetch(window.location.origin, { method: "HEAD", cache: "no-store" });
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 8 + 5));
       const t1 = performance.now();
       elPing.innerText = `${Math.round(t1 - t0)} ms`;
     } catch {

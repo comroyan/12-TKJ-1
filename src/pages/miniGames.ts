@@ -150,8 +150,6 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
       <div class="space-y-6 animate-fadeIn text-slate-100 font-sans">
         <!-- Dashboard Header / Status Bar -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 glass rounded-3xl relative overflow-hidden bg-gradient-to-r from-slate-900 to-slate-950">
-          <div class="absolute right-0 top-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl"></div>
-          
           <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-2xl font-bold font-mono">
               ${level}
