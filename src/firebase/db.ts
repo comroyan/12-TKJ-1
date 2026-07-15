@@ -708,6 +708,17 @@ export async function addContact(data: any) {
   }
 }
 
+export async function updateContact(id: string, data: any) {
+  const path = `contacts/${id}`;
+  try {
+    await updateDoc(doc(db, "contacts", id), data);
+    invalidateCache("contacts");
+    await writeAuditLog("Contact Updated", `Memperbarui kontak ID: ${id}`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 export async function deleteContact(id: string) {
   const path = `contacts/${id}`;
   try {

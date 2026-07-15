@@ -1,4 +1,4 @@
-import { getContacts, addContact, deleteContact, getNotifications, createNotification, markNotificationRead } from "../firebase/db";
+import { getContacts, addContact, updateContact, deleteContact, getNotifications, createNotification, markNotificationRead } from "../firebase/db";
 import { renderIcons, formatDate, toast, confirmDialog } from "../utils/helpers";
 import Swal from "sweetalert2";
 
@@ -11,12 +11,23 @@ export async function renderContacts(container: HTMLElement, userSession: any) {
   `;
 
   async function loadAndRender() {
-    const [contacts, notifications] = await Promise.all([
-      getContacts(),
-      getNotifications()
-    ]);
+    let contacts = await getContacts();
+    const notifications = await getNotifications();
 
     const isEditor = userSession.role === "Super Admin" || userSession.role === "Sekretaris" || userSession.role === "Wakil" || userSession.role === "Bendahara";
+
+    // Seed default contacts to Firestore so they are 100% customizable and editable!
+    if (contacts.length === 0) {
+      const defaultContacts = [
+        { name: "Bapak Adi Sucipto, S.Pd", title: "Wali Kelas XII TKJ 1", hp: "6281234567890", notes: "NIP. 19850215 201012 1 002" },
+        { name: "Ibu Erna Wati, M.T", title: "Kepala Program Studi TKJ", hp: "6281298765432", notes: "Guru Produktif Cisco CCNA" },
+        { name: "Ibu Sulastri, S.Psi", title: "Guru Bimbingan Konseling", hp: "6281255554444", notes: "Konsultasi PKL & Karir" }
+      ];
+      for (const dc of defaultContacts) {
+        await addContact(dc);
+      }
+      contacts = await getContacts();
+    }
 
     // Mark unread notifications
     notifications.forEach((notif: any) => {
@@ -50,93 +61,54 @@ export async function renderContacts(container: HTMLElement, userSession: any) {
 
         <!-- Tab Selector -->
         <div class="flex border-b border-slate-800 gap-6">
-          <button id="tabContacts" class="pb-3 text-sm font-semibold border-b-2 border-cyan-500 text-cyan-400 transition-colors">Daftar Kontak Penting (${contacts.length + 5})</button>
+          <button id="tabContacts" class="pb-3 text-sm font-semibold border-b-2 border-cyan-500 text-cyan-400 transition-colors">Daftar Kontak Penting (${contacts.length})</button>
           <button id="tabNotifications" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white transition-colors">Siaran Pengumuman (${notifications.length})</button>
         </div>
 
         <!-- Contacts Section -->
         <div id="contactsSection" class="space-y-6">
-          <!-- Official default contacts -->
           <div>
-            <h3 class="text-xs font-bold text-slate-500 tracking-wider uppercase mb-3">Kontak Utama Sekolah & Jurusan</h3>
+            <h3 class="text-xs font-bold text-slate-500 tracking-wider uppercase mb-3">Daftar Kontak Resmi & Penting</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <!-- Wali Kelas -->
-              <div class="glass p-5 rounded-3xl flex items-center justify-between glass-card-hover bg-slate-900/25 border-l-4 border-l-rose-500">
-                <div class="flex items-center gap-4">
-                  <div class="p-3 bg-rose-500/10 text-rose-400 rounded-2xl"><i data-lucide="user" class="w-6 h-6"></i></div>
-                  <div>
-                    <h4 class="text-sm font-bold text-white">Bapak Adi Sucipto, S.Pd</h4>
-                    <span class="text-[10px] text-rose-400 font-semibold block uppercase">Wali Kelas XII TKJ 1</span>
-                    <span class="text-[10px] text-slate-500 block">NIP. 19850215 201012 1 002</span>
-                  </div>
-                </div>
-                <a href="https://wa.me/6281234567890" target="_blank" class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="Hubungi WhatsApp">
-                  <i data-lucide="phone-call" class="w-4 h-4"></i>
-                </a>
-              </div>
+              ${contacts.map((c: any, idx: number) => {
+                const borderColors = [
+                  "border-l-rose-500 bg-slate-900/25", 
+                  "border-l-purple-500 bg-slate-900/25", 
+                  "border-l-amber-500 bg-slate-900/25",
+                  "border-l-cyan-500 bg-slate-900/20",
+                  "border-l-emerald-500 bg-slate-900/20",
+                  "border-l-blue-500 bg-slate-900/20"
+                ];
+                const colorClass = borderColors[idx % borderColors.length];
+                const iconMap = ["user", "award", "heart", "users", "phone"];
+                const iconName = iconMap[idx % iconMap.length];
 
-              <!-- Kaprog TKJ -->
-              <div class="glass p-5 rounded-3xl flex items-center justify-between glass-card-hover bg-slate-900/25 border-l-4 border-l-purple-500">
-                <div class="flex items-center gap-4">
-                  <div class="p-3 bg-purple-500/10 text-purple-400 rounded-2xl"><i data-lucide="award" class="w-6 h-6"></i></div>
-                  <div>
-                    <h4 class="text-sm font-bold text-white">Ibu Erna Wati, M.T</h4>
-                    <span class="text-[10px] text-purple-400 font-semibold block uppercase">Kepala Program Studi TKJ</span>
-                    <span class="text-[10px] text-slate-500 block">Guru Produktif Cisco CCNA</span>
-                  </div>
-                </div>
-                <a href="https://wa.me/6281298765432" target="_blank" class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="Hubungi WhatsApp">
-                  <i data-lucide="phone-call" class="w-4 h-4"></i>
-                </a>
-              </div>
-
-              <!-- BP/BK -->
-              <div class="glass p-5 rounded-3xl flex items-center justify-between glass-card-hover bg-slate-900/25 border-l-4 border-l-amber-500">
-                <div class="flex items-center gap-4">
-                  <div class="p-3 bg-amber-500/10 text-amber-400 rounded-2xl"><i data-lucide="heart" class="w-6 h-6"></i></div>
-                  <div>
-                    <h4 class="text-sm font-bold text-white">Ibu Sulastri, S.Psi</h4>
-                    <span class="text-[10px] text-amber-400 font-semibold block uppercase">Guru Bimbingan Konseling</span>
-                    <span class="text-[10px] text-slate-500 block">Konsultasi PKL & Karir</span>
-                  </div>
-                </div>
-                <a href="https://wa.me/6281255554444" target="_blank" class="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="Hubungi WhatsApp">
-                  <i data-lucide="phone-call" class="w-4 h-4"></i>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Custom class contacts -->
-          <div>
-            <h3 class="text-xs font-bold text-slate-500 tracking-wider uppercase mb-3">Kontak Tambahan (Guru / Instansi PKL)</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              ${contacts.length > 0 ? contacts.map((c: any) => `
-                <div class="glass p-5 rounded-3xl flex items-center justify-between glass-card-hover bg-slate-900/20 border-l-4 border-l-cyan-500">
-                  <div class="flex items-center gap-4">
-                    <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-2xl"><i data-lucide="user" class="w-6 h-6"></i></div>
-                    <div>
-                      <h4 class="text-sm font-bold text-white">${c.name}</h4>
-                      <span class="text-[10px] text-cyan-400 font-semibold block uppercase">${c.title}</span>
-                      <span class="text-[10px] text-slate-500 block">${c.notes || ""}</span>
+                return `
+                  <div class="glass p-5 rounded-3xl flex items-center justify-between glass-card-hover border-l-4 ${colorClass}">
+                    <div class="flex items-center gap-4">
+                      <div class="p-3 bg-slate-800/80 text-cyan-400 rounded-2xl"><i data-lucide="${iconName}" class="w-6 h-6"></i></div>
+                      <div>
+                        <h4 class="text-sm font-bold text-white">${c.name}</h4>
+                        <span class="text-[10px] text-cyan-400 font-semibold block uppercase tracking-wider">${c.title}</span>
+                        <span class="text-[10px] text-slate-500 block">${c.notes || ""}</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <a href="https://wa.me/${c.hp.replace(/\D/g, '')}" target="_blank" class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="Hubungi WhatsApp">
+                        <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                      </a>
+                      ${isEditor ? `
+                        <button class="editContactBtn p-2 bg-slate-950/80 hover:bg-cyan-500 hover:text-slate-950 border border-slate-800 rounded-xl text-cyan-400 transition-colors" data-id="${c.id}" title="Edit Kontak">
+                          <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button class="deleteContactBtn p-2 bg-slate-950/80 hover:bg-rose-500 hover:text-slate-950 border border-slate-800 rounded-xl text-rose-400 transition-colors" data-id="${c.id}" title="Hapus Kontak">
+                          <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      ` : ""}
                     </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <a href="https://wa.me/${c.hp.replace(/\D/g, '')}" target="_blank" class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="Hubungi WhatsApp">
-                      <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                    </a>
-                    ${isEditor ? `
-                      <button class="deleteContactBtn p-2 bg-slate-950/80 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-800 rounded-xl text-slate-400 transition-colors" data-id="${c.id}">
-                        <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
-                      </button>
-                    ` : ""}
-                  </div>
-                </div>
-              `).join("") : `
-                <div class="col-span-full py-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-3xl text-xs italic">
-                  Belum ada kontak tambahan. Hubungi Sekretaris untuk mendaftarkan kontak guru/pengawas baru.
-                </div>
-              `}
+                `;
+              }).join("")}
             </div>
           </div>
         </div>
@@ -212,6 +184,70 @@ export async function renderContacts(container: HTMLElement, userSession: any) {
             Swal.fire("Error", e.message, "error");
           }
         }
+      });
+    });
+
+    // Edit contact listener
+    document.querySelectorAll(".editContactBtn").forEach((btn: any) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const c = contacts.find((contact: any) => contact.id === id);
+        if (!c) return;
+
+        Swal.fire({
+          title: "Ubah/Edit Kontak",
+          background: "#0f172a",
+          color: "#f8fafc",
+          html: `
+            <div class="space-y-4 text-left mt-4 font-sans">
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Nama Lengkap & Gelar</label>
+                <input type="text" id="editCName" value="${c.name}" placeholder="Contoh: Bapak Drs. Bambang" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Peran / Jabatan</label>
+                  <input type="text" id="editCTitle" value="${c.title}" placeholder="Contoh: Guru Pemrograman" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Nomor WA (Awali 62)</label>
+                  <input type="text" id="editCHp" value="${c.hp}" placeholder="Contoh: 6281..." class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Catatan Tambahan</label>
+                <input type="text" id="editCNotes" value="${c.notes || ''}" placeholder="Misalnya: Pengawas industri PKL" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+              </div>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "Simpan Perubahan",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#06b6d4",
+          cancelButtonColor: "#334155",
+          preConfirm: () => {
+            const name = (document.getElementById("editCName") as HTMLInputElement).value.trim();
+            const title = (document.getElementById("editCTitle") as HTMLInputElement).value.trim();
+            const hp = (document.getElementById("editCHp") as HTMLInputElement).value.trim();
+            const notes = (document.getElementById("editCNotes") as HTMLInputElement).value.trim();
+
+            if (!name || !title || !hp) {
+              Swal.showValidationMessage("Harap isi Nama, Jabatan, and No. WhatsApp!");
+              return false;
+            }
+            return { name, title, hp, notes };
+          }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            try {
+              await updateContact(id, result.value);
+              toast.success("Kontak berhasil diperbarui!");
+              loadAndRender();
+            } catch (err: any) {
+              Swal.fire("Gagal", err.message, "error");
+            }
+          }
+        });
       });
     });
 

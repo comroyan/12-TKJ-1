@@ -734,35 +734,68 @@ export async function renderKas(container: HTMLElement, userSession: any) {
             }
           });
         } else {
-          // UNPAID CELL -> Check it instantly!
-          try {
-            // Place the timestamp accurately inside that week's dates
-            const currentDay = new Date().getDate();
-            let paymentDay = Math.round((startDay + endDay) / 2);
-            // If today matches the selected month and is within the week, use today's date
-            if (new Date().getMonth() === selectedMonth && new Date().getFullYear() === selectedYear && currentDay >= startDay && currentDay <= endDay) {
-              paymentDay = currentDay;
+          // UNPAID CELL -> Prompt for nominal first so they can change/customize it!
+          Swal.fire({
+            title: `Catat Iuran M${weekNum}`,
+            background: "#0f172a",
+            color: "#f8fafc",
+            html: `
+              <div class="text-left space-y-3 text-xs mt-4 font-sans">
+                <p class="text-slate-400">Catat pembayaran iuran untuk <strong>${studentName}</strong> pada Minggu ${weekNum} (${selectedMonthName} ${selectedYear}).</p>
+                <div>
+                  <label class="block font-semibold mb-1 text-slate-400">Nominal Pembayaran (Rupiah)</label>
+                  <input type="number" id="manualCellAmount" value="${weeklyIuranRate}" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+                </div>
+              </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: "✓ Catat Lunas",
+            cancelButtonText: "Batal",
+            confirmButtonColor: "#10b981",
+            cancelButtonColor: "#334155",
+            focusConfirm: true,
+            preConfirm: () => {
+              const amountVal = (document.getElementById("manualCellAmount") as HTMLInputElement).value;
+              const parsed = parseInt(amountVal);
+              if (isNaN(parsed) || parsed <= 0) {
+                Swal.showValidationMessage("Harap masukkan nominal yang valid!");
+                return false;
+              }
+              return parsed;
             }
-            
-            const customDate = new Date(selectedYear, selectedMonth, paymentDay, 12, 0, 0, 0);
+          }).then(async (result) => {
+            if (result.isConfirmed) {
+              const paymentAmount = result.value;
+              try {
+                // Place the timestamp accurately inside that week's dates
+                const currentDay = new Date().getDate();
+                let paymentDay = Math.round((startDay + endDay) / 2);
+                // If today matches the selected month and is within the week, use today's date
+                if (new Date().getMonth() === selectedMonth && new Date().getFullYear() === selectedYear && currentDay >= startDay && currentDay <= endDay) {
+                  paymentDay = currentDay;
+                }
+                
+                const customDate = new Date(selectedYear, selectedMonth, paymentDay, 12, 0, 0, 0);
 
-            toast.info(`Mencatat iuran ${studentName}...`);
-            await addClassFundEntry({
-              userId: studentId,
-              studentName: studentName,
-              amount: weeklyIuranRate,
-              type: "in",
-              description: `Iuran Kas M${weekNum} (${selectedMonthName} ${selectedYear})`,
-              evidenceUrl: "",
-              status: "approved",
-              date: customDate
-            });
+                toast.info(`Mencatat iuran ${studentName}...`);
+                await addClassFundEntry({
+                  userId: studentId,
+                  studentName: studentName,
+                  amount: paymentAmount,
+                  type: "in",
+                  description: `Iuran Kas M${weekNum} (${selectedMonthName} ${selectedYear})`,
+                  evidenceUrl: "",
+                  status: "approved",
+                  date: customDate
+                });
 
-            toast.success(`Lunas! Iuran ${studentName} Minggu ${weekNum} dicatat.`);
-            loadAndRender();
-          } catch (err: any) {
-            toast.error(err.message);
-          }
+                toast.success(`Lunas! Iuran ${studentName} Minggu ${weekNum} sebesar ${formatRupiah(paymentAmount)} dicatat.`);
+                loadAndRender();
+              } catch (err: any) {
+                toast.error(err.message);
+              }
+            }
+          });
         }
       });
     });
@@ -778,9 +811,14 @@ export async function renderKas(container: HTMLElement, userSession: any) {
             <div class="p-3.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-2xl">
               <p class="font-bold text-sm">Informasi Pembayaran:</p>
               <p class="mt-1">Iuran: <strong>Minggu ${weekNum} (${startDay}-${endDay} ${selectedMonthName} ${selectedYear})</strong></p>
-              <p>Nominal: <strong>${formatRupiah(weeklyIuranRate)}</strong></p>
+              <p>Nominal Standar: <strong>${formatRupiah(weeklyIuranRate)}</strong></p>
             </div>
             
+            <div>
+              <label class="block font-semibold mb-1 text-slate-400">Nominal Pembayaran (Rupiah)</label>
+              <input type="number" id="quickAmount" value="${weeklyIuranRate}" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
+            </div>
+
             <div>
               <label class="block font-semibold mb-1 text-slate-400">Unggah Bukti Transfer / SS Chat Bendahara (Maks 4MB)</label>
               <input type="file" id="quickReceipt" accept="image/*,application/pdf" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20 cursor-pointer">
@@ -801,6 +839,8 @@ export async function renderKas(container: HTMLElement, userSession: any) {
           const fileInput = document.getElementById("quickReceipt") as HTMLInputElement;
           const file = fileInput?.files?.[0];
           const desc = (document.getElementById("quickDesc") as HTMLTextAreaElement).value.trim();
+          const amountInput = document.getElementById("quickAmount") as HTMLInputElement;
+          const amount = parseInt(amountInput?.value || "0") || weeklyIuranRate;
 
           let evidenceUrl = "";
           if (file) {
@@ -809,18 +849,18 @@ export async function renderKas(container: HTMLElement, userSession: any) {
             evidenceUrl = uploadResult.fileUrl;
           }
 
-          return { evidenceUrl, desc };
+          return { evidenceUrl, desc, amount };
         }
       }).then(async (result) => {
         if (result.isConfirmed) {
-          const { evidenceUrl, desc } = result.value;
+          const { evidenceUrl, desc, amount } = result.value;
           try {
             const paymentDate = new Date(selectedYear, selectedMonth, Math.round((startDay + endDay) / 2), 12, 0, 0, 0);
 
             await addClassFundEntry({
               userId: userSession.uid,
               studentName: userSession.name,
-              amount: weeklyIuranRate,
+              amount: amount,
               type: "in",
               description: `Iuran Kas M${weekNum} (${selectedMonthName} ${selectedYear}) ${desc ? '- ' + desc : ''}`,
               evidenceUrl: evidenceUrl,
