@@ -1,5 +1,5 @@
-import { getSchedules, saveSchedule, getPickets, savePicket, getStudentUsers } from "../firebase/db";
-import { renderIcons, toast, isOddWeek } from "../utils/helpers";
+import { getSchedules, saveSchedule, getPickets, savePicket, getStudentUsers, getTasks, addTask, createNotification } from "../firebase/db";
+import { renderIcons, toast, isOddWeek, formatDate } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderJadwal(container: HTMLElement, userSession: any) {
@@ -16,10 +16,11 @@ export async function renderJadwal(container: HTMLElement, userSession: any) {
   `;
 
   async function loadAndRender() {
-    const [schedules, pickets, students] = await Promise.all([
+    const [schedules, pickets, students, tasks] = await Promise.all([
       getSchedules(),
       getPickets(),
-      getStudentUsers()
+      getStudentUsers(),
+      getTasks()
     ]);
 
     const isEditor = userSession.role === "Super Admin" || 
@@ -42,6 +43,52 @@ export async function renderJadwal(container: HTMLElement, userSession: any) {
             <p class="text-slate-400 text-sm mt-1">Koordinasi mingguan jadwal pelajaran sekolah dan pembagian shift piket kebersihan.</p>
           </div>
         </div>
+
+        <!-- Tomorrow's Tasks Alert Banner -->
+        ${(() => {
+          const today = new Date();
+          const tomorrowStr = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toDateString();
+          
+          const tomorrowTasks = tasks.filter((t: any) => {
+            if (t.status !== "pending") return false;
+            const dl = new Date(t.deadline);
+            return dl.toDateString() === tomorrowStr;
+          });
+
+          if (tomorrowTasks.length === 0) {
+            return `
+              <div class="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex items-center gap-3 text-xs text-slate-400">
+                <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
+                <div>
+                  <span class="font-bold text-slate-200 block">Bebas Tugas Esok Hari!</span>
+                  <span class="text-[11px] text-slate-400">Tidak ada tugas kelas yang perlu dikumpulkan besok. Selamat bersenang-senang!</span>
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+              <div class="flex items-start gap-3">
+                <div class="p-2.5 bg-amber-500/15 text-amber-400 rounded-xl shrink-0"><i data-lucide="alert-triangle" class="w-5 h-5 animate-bounce"></i></div>
+                <div>
+                  <span class="font-extrabold text-amber-400 text-sm">Penting: Ada ${tomorrowTasks.length} Tugas Dikumpulkan Besok!</span>
+                  <div class="mt-1.5 space-y-1">
+                    ${tomorrowTasks.map((t: any) => `
+                      <div class="flex items-center gap-1.5 text-slate-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        <strong class="text-white">[Mapel: ${t.subject}]</strong> ${t.title}
+                      </div>
+                    `).join("")}
+                  </div>
+                </div>
+              </div>
+              <button id="goToTugasPageBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-[11px] transition-all self-start md:self-center">
+                Buka Planner Tugas
+              </button>
+            </div>
+          `;
+        })()}
 
         <!-- Tab Selector (Lessons vs Picket) -->
         <div class="flex border-b border-slate-800 gap-6">
@@ -93,13 +140,43 @@ export async function renderJadwal(container: HTMLElement, userSession: any) {
                       ${isUsingFallback ? "Default (Klik ubah untuk pisahkan)" : `Minggu ${selectedWeekType === 'ganjil' ? 'Ganjil' : 'Genap'}`}
                     </span>
                     <div class="space-y-3">
-                      ${sched.subjects && sched.subjects.length > 0 ? sched.subjects.map((s: any) => `
-                        <div class="p-2.5 bg-slate-950/40 border border-slate-800/40 rounded-xl space-y-1">
-                          <span class="text-xs font-semibold text-white block">${s.subject}</span>
-                          <span class="text-[10px] text-slate-400 block">${s.teacher}</span>
-                          <span class="inline-block text-[9px] font-mono font-medium text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 mt-1">${s.time}</span>
-                        </div>
-                      `).join("") : `<p class="text-xs text-slate-500 italic py-2">Libur / Kosong</p>`}
+                      ${sched.subjects && sched.subjects.length > 0 ? sched.subjects.map((s: any) => {
+                        const matchingTasks = tasks.filter((t: any) => 
+                          t.status === "pending" && 
+                          t.subject.toLowerCase().trim() === s.subject.toLowerCase().trim()
+                        );
+                        
+                        return `
+                          <div class="p-2.5 bg-slate-950/40 border border-slate-800/40 rounded-xl space-y-1 relative group/sub">
+                            <span class="text-xs font-semibold text-white block">${s.subject}</span>
+                            <span class="text-[10px] text-slate-400 block">${s.teacher}</span>
+                            <span class="inline-block text-[9px] font-mono font-medium text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 mt-1">${s.time}</span>
+                            
+                            <!-- Add task shortcut button for class editors next to each subject -->
+                            ${isEditor ? `
+                              <button class="addSubjectTaskBtn absolute top-2.5 right-2.5 p-1 bg-slate-900 hover:bg-yellow-500 hover:text-slate-950 text-yellow-500 rounded-lg opacity-0 group-hover/sub:opacity-100 transition-opacity duration-200 cursor-pointer" data-subject="${s.subject}" title="Tambah Tugas untuk pelajaran ini">
+                                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                              </button>
+                            ` : ""}
+
+                            <!-- Linked active tasks list -->
+                            ${matchingTasks.length > 0 ? `
+                              <div class="mt-2 pt-2 border-t border-slate-800/60 space-y-1.5">
+                                <span class="text-[9px] font-extrabold text-yellow-500 uppercase tracking-wider block">Tugas Aktif (${matchingTasks.length}):</span>
+                                ${matchingTasks.map((t: any) => `
+                                  <div class="text-[10px] text-slate-300 flex items-start gap-1">
+                                    <span class="w-1 h-1 rounded-full bg-yellow-400 mt-1.5 shrink-0 animate-pulse"></span>
+                                    <div>
+                                      <span class="font-semibold block text-slate-200 leading-snug">${t.title}</span>
+                                      <span class="text-[9px] text-slate-500 font-mono">Dl: ${formatDate(t.deadline)}</span>
+                                    </div>
+                                  </div>
+                                `).join("")}
+                              </div>
+                            ` : ""}
+                          </div>
+                        `;
+                      }).join("") : `<p class="text-xs text-slate-500 italic py-2">Libur / Kosong</p>`}
                     </div>
                   </div>
                   ${isEditor ? `
@@ -298,6 +375,107 @@ export async function renderJadwal(container: HTMLElement, userSession: any) {
               loadAndRender();
             } catch (err: any) {
               Swal.fire("Gagal menyimpan", err.message, "error");
+            }
+          }
+        });
+      });
+    });
+
+    // Go to Tugas page banner button click listener
+    const goToTugasPageBtn = document.getElementById("goToTugasPageBtn");
+    if (goToTugasPageBtn) {
+      goToTugasPageBtn.addEventListener("click", () => {
+        const btn = document.querySelector(`.nav-item[data-page="tugas"]`) as HTMLButtonElement;
+        if (btn) btn.click();
+      });
+    }
+
+    // Add subject task click listener
+    document.querySelectorAll(".addSubjectTaskBtn").forEach((btn: any) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const subject = btn.dataset.subject;
+
+        Swal.fire({
+          title: `Tambah Tugas: ${subject}`,
+          background: "#0f172a",
+          color: "#f8fafc",
+          html: `
+            <div class="space-y-4 text-left mt-4 font-sans">
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Judul Tugas</label>
+                <input type="text" id="newTaskTitle" placeholder="Misal: Latihan Soal Bab 3 atau Praktikum Cisco" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm font-sans">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Deskripsi & Instruksi</label>
+                <textarea id="newTaskDesc" placeholder="Tulis instruksi lengkap tugas di sini..." class="w-full h-24 px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm resize-none font-sans"></textarea>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Prioritas</label>
+                  <select id="newTaskPriority" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm font-sans">
+                    <option value="Sedang">Sedang</option>
+                    <option value="Tinggi">Tinggi</option>
+                    <option value="Rendah">Rendah</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Jenis Tugas</label>
+                  <select id="newTaskType" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm font-sans">
+                    <option value="Individu">Individu</option>
+                    <option value="Kelompok">Kelompok</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Tanggal Deadline</label>
+                <input type="date" id="newTaskDeadline" class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm font-sans">
+              </div>
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: "✓ Tambah Tugas",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#eab308",
+          cancelButtonColor: "#334155",
+          preConfirm: () => {
+            const title = (document.getElementById("newTaskTitle") as HTMLInputElement).value.trim();
+            const description = (document.getElementById("newTaskDesc") as HTMLTextAreaElement).value.trim();
+            const priority = (document.getElementById("newTaskPriority") as HTMLSelectElement).value;
+            const type = (document.getElementById("newTaskType") as HTMLSelectElement).value;
+            const deadline = (document.getElementById("newTaskDeadline") as HTMLInputElement).value;
+
+            if (!title || !deadline) {
+              Swal.showValidationMessage("Harap isi Judul dan Tanggal Deadline!");
+              return false;
+            }
+
+            return {
+              title,
+              description,
+              priority,
+              type,
+              deadline,
+              subject,
+              status: "pending",
+              createdBy: userSession.name
+            };
+          }
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            try {
+              // Add task
+              await addTask(result.value);
+
+              // Send real-time notification
+              const notificationTitle = `Tugas Baru: ${subject}`;
+              const notificationContent = `Tugas "${result.value.title}" baru saja ditambahkan oleh ${userSession.name}. Deadline: ${formatDate(result.value.deadline)}.`;
+              await createNotification(notificationTitle, notificationContent, "warning");
+
+              toast.success("Tugas baru berhasil ditambahkan & notifikasi terkirim!");
+              loadAndRender();
+            } catch (err: any) {
+              Swal.fire("Gagal", err.message, "error");
             }
           }
         });

@@ -2,7 +2,8 @@ import {
   getStudentUsers, 
   createStudentUser, 
   updateStudentUser, 
-  deleteStudentUser 
+  deleteStudentUser,
+  createNotification
 } from "../firebase/db";
 import { adminCreateStudentAuthAndProfile } from "../firebase/auth";
 import { renderIcons, toast, confirmDialog } from "../utils/helpers";
@@ -31,11 +32,16 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
             </h1>
             <p class="text-slate-400 text-sm mt-1">Daftar siswa resmi, peranan, dan penempatan PKL.</p>
           </div>
-          ${isSAdmin ? `
-            <button id="addStudentBtn" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-2xl shadow-lg shadow-cyan-500/10 transition-all duration-300">
-              <i data-lucide="plus" class="w-4 h-4"></i> Tambah Siswa Baru
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="groupMakerBtn" class="flex items-center gap-1.5 px-4 py-2 bg-slate-900 border border-slate-800 hover:border-cyan-500 hover:text-cyan-400 text-slate-200 font-bold rounded-xl text-sm transition-all shadow-lg shadow-cyan-500/5">
+              <i data-lucide="shuffle" class="w-4 h-4 text-cyan-400"></i> Buat Kelompok
             </button>
-          ` : ""}
+            ${isSAdmin ? `
+              <button id="addStudentBtn" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-2xl shadow-lg shadow-cyan-500/10 transition-all duration-300">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Siswa Baru
+              </button>
+            ` : ""}
+          </div>
         </div>
 
         <!-- Filters & Search -->
@@ -173,6 +179,168 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
       document.querySelectorAll(".deleteBtn").forEach((btn: any) => {
         btn.addEventListener("click", () => handleDeleteStudent(btn.dataset.uid, btn.dataset.name));
       });
+
+      // Group Maker Click Listener
+      const groupMakerBtn = document.getElementById("groupMakerBtn") as HTMLButtonElement;
+      if (groupMakerBtn) {
+        groupMakerBtn.addEventListener("click", () => {
+          Swal.fire({
+            title: "Pengaturan Acak Kelompok",
+            background: "#0f172a",
+            color: "#f8fafc",
+            html: `
+              <div class="space-y-4 text-left mt-4 font-sans max-h-[400px] overflow-y-auto pr-1">
+                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
+                  <span class="text-xs font-bold text-cyan-400 block">Metode Pembagian</span>
+                  <select id="gmMethod" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+                    <option value="groupCount">Berdasarkan Jumlah Kelompok (Misal: dibagi jadi 4 kelompok)</option>
+                    <option value="memberCount">Berdasarkan Anggota per Kelompok (Misal: 4 orang per kelompok)</option>
+                  </select>
+                </div>
+
+                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
+                  <span class="text-xs font-bold text-cyan-400 block">Nilai Pembagi (2-8)</span>
+                  <select id="gmValue" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                  </select>
+                </div>
+
+                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-cyan-400">Siswa yang Disertakan</span>
+                    <button type="button" id="toggleAllStudents" class="text-[10px] text-cyan-400 hover:underline">Semua / Kosongkan</button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-1 mt-1.5">
+                    ${students.filter((s: any) => (s.status || "aktif") !== "nonaktif").map((s: any) => `
+                      <label class="flex items-center gap-2 p-1.5 bg-slate-950/50 border border-slate-800/60 rounded-lg cursor-pointer hover:border-cyan-500/30 transition-all">
+                        <input type="checkbox" name="gmStudentCheck" value="${s.id}" data-name="${s.name}" checked class="accent-cyan-500 rounded">
+                        <span class="text-[10px] text-slate-300 line-clamp-1">Absen ${s.absen} - ${s.name}</span>
+                      </label>
+                    `).join("")}
+                  </div>
+                </div>
+              </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: "🎲 Acak Sekarang",
+            cancelButtonText: "Batal",
+            confirmButtonColor: "#06b6d4",
+            cancelButtonColor: "#334155",
+            didOpen: () => {
+              const toggleBtn = document.getElementById("toggleAllStudents");
+              if (toggleBtn) {
+                toggleBtn.addEventListener("click", () => {
+                  const checkboxes = document.querySelectorAll("input[name='gmStudentCheck']") as NodeListOf<HTMLInputElement>;
+                  const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
+                  checkboxes.forEach((cb) => {
+                    cb.checked = !allChecked;
+                  });
+                  toggleBtn.innerText = allChecked ? "Pilih Semua" : "Kosongkan Semua";
+                });
+              }
+            },
+            preConfirm: () => {
+              const method = (document.getElementById("gmMethod") as HTMLSelectElement).value;
+              const value = parseInt((document.getElementById("gmValue") as HTMLSelectElement).value);
+              const checkedBoxes = document.querySelectorAll("input[name='gmStudentCheck']:checked") as NodeListOf<HTMLInputElement>;
+              const selectedStudents = Array.from(checkedBoxes).map((cb) => ({
+                id: cb.value,
+                name: cb.dataset.name || "Siswa"
+              }));
+
+              if (selectedStudents.length === 0) {
+                Swal.showValidationMessage("Harap sertakan minimal 1 siswa!");
+                return false;
+              }
+
+              return { method, value, selectedStudents };
+            }
+          }).then((result) => {
+            if (result.isConfirmed) {
+              const { method, value, selectedStudents } = result.value;
+              
+              // Fisher-Yates Shuffle
+              const shuffled = [...selectedStudents];
+              for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+              }
+
+              const numStudents = shuffled.length;
+              let numGroups = 1;
+
+              if (method === "groupCount") {
+                numGroups = Math.min(value, numStudents);
+              } else {
+                numGroups = Math.max(1, Math.ceil(numStudents / value));
+              }
+
+              const groups: any[][] = Array.from({ length: numGroups }, () => []);
+              shuffled.forEach((student, index) => {
+                groups[index % numGroups].push(student);
+              });
+
+              let outputHtml = `<div class="space-y-4 text-left mt-2 max-h-[350px] overflow-y-auto pr-1 font-sans">`;
+              let outputText = `📌 HASIL PEMBAGIAN KELOMPOK XII TKJ 1\n`;
+              outputText += `Dibuat secara acak otomatis pada: ${new Date().toLocaleString("id-ID")}\n\n`;
+
+              groups.forEach((group, idx) => {
+                const groupNum = idx + 1;
+                outputHtml += `
+                  <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl border-l-4 border-l-cyan-500 space-y-1.5">
+                    <span class="text-xs font-bold text-cyan-400 block uppercase tracking-wider">Kelompok ${groupNum} (${group.length} Siswa)</span>
+                    <div class="grid grid-cols-1 gap-1 text-[11px] text-slate-300">
+                      ${group.map((s, i) => `<div>${i + 1}. ${s.name}</div>`).join("")}
+                    </div>
+                  </div>
+                `;
+
+                outputText += `• Kelompok ${groupNum}:\n`;
+                group.forEach((s, i) => {
+                  outputText += `  ${i + 1}. ${s.name}\n`;
+                });
+                outputText += `\n`;
+              });
+              outputHtml += `</div>`;
+
+              Swal.fire({
+                title: "Hasil Acak Kelompok",
+                background: "#0f172a",
+                color: "#f8fafc",
+                html: outputHtml,
+                showCancelButton: true,
+                confirmButtonText: "📋 Salin Hasil",
+                cancelButtonText: "Tutup",
+                confirmButtonColor: "#06b6d4",
+                cancelButtonColor: "#334155",
+                showDenyButton: true,
+                denyButtonText: "📢 Siarkan Pengumuman",
+                denyButtonColor: "#f59e0b",
+              }).then(async (res) => {
+                if (res.isConfirmed) {
+                  navigator.clipboard.writeText(outputText);
+                  toast.success("Hasil kelompok berhasil disalin ke clipboard!");
+                } else if (res.isDenied) {
+                  try {
+                    const announceTitle = "Pembagian Kelompok Baru";
+                    const announceContent = `Berikut pembagian kelompok acak XII TKJ 1:\n\n${outputText}`;
+                    await createNotification(announceTitle, announceContent, "info");
+                    toast.success("Hasil kelompok disiarkan ke Siaran Pengumuman!");
+                  } catch (err: any) {
+                    Swal.fire("Gagal Menyiarkan", err.message, "error");
+                  }
+                }
+              });
+            }
+          });
+        });
+      }
     }
 
     // Filter Logic

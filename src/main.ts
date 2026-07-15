@@ -1,6 +1,6 @@
 import "./index.css";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, collection, query, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "./firebase/config";
 import { 
   isSetupCompleted, 
@@ -37,6 +37,7 @@ import { renderSubmissions } from "./pages/submissions";
 // App Core State
 let activeUserSession: UserSession | null = null;
 let currentActivePage = "dashboard";
+let globalUnsubscribeNotifications: (() => void) | null = null;
 
 // PWA Service Worker Registration
 if ("serviceWorker" in navigator) {
@@ -601,6 +602,27 @@ async function renderMainLayout() {
 
   renderIcons();
 
+  // Setup real-time notifications listener
+  if (globalUnsubscribeNotifications) {
+    globalUnsubscribeNotifications();
+    globalUnsubscribeNotifications = null;
+  }
+
+  let isInitialLoad = true;
+  const notificationsQuery = query(collection(db, "notifications"), orderBy("date", "desc"), limit(1));
+  globalUnsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+    if (isInitialLoad) {
+      isInitialLoad = false;
+      return;
+    }
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === "added") {
+        const notif = change.doc.data();
+        toast.info(`📢 ${notif.title || 'Pengumuman'}\n${notif.content || ''}`);
+      }
+    });
+  });
+
   // Setup dynamic page routing listener
   const navItems = document.querySelectorAll(".nav-item");
   const mobileBurgerBtn = document.getElementById("mobileBurgerBtn") as HTMLButtonElement;
@@ -715,6 +737,10 @@ async function renderMainLayout() {
   // Logout listener
   document.getElementById("logoutBtn")?.addEventListener("click", async () => {
     try {
+      if (globalUnsubscribeNotifications) {
+        globalUnsubscribeNotifications();
+        globalUnsubscribeNotifications = null;
+      }
       await logoutUser();
       toast.success("Berhasil keluar dari portal.");
     } catch (e: any) {
