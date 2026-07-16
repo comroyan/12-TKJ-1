@@ -179,6 +179,9 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
             <button class="tab-btn px-4 py-2 text-xs font-semibold rounded-xl border border-slate-800 transition-all ${activeTab === 'ai' ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'}" data-tab="ai">
               🤖 AI Belajar
             </button>
+            <button class="tab-btn px-4 py-2 text-xs font-semibold rounded-xl border border-slate-800 transition-all ${activeTab === 'tools' ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'}" data-tab="tools">
+              🛠️ Alat TKJ
+            </button>
           </div>
         </div>
 
@@ -512,6 +515,166 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
                 <button id="sendAiChatBtn" class="px-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                   Kirim <i data-lucide="send" class="w-4 h-4"></i>
                 </button>
+              </div>
+            </div>
+          ` : ""}
+
+          <!-- 8. TAB: ALAT TKJ (IP CALCULATOR & CHEAT SHEET) -->
+          ${activeTab === 'tools' ? `
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fadeIn">
+              <!-- Subnet Calculator (Left - 7 cols) -->
+              <div class="lg:col-span-7 glass rounded-3xl p-6 border border-slate-850 space-y-6">
+                <div class="flex items-center gap-2 border-b border-slate-800 pb-4">
+                  <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                    <i data-lucide="calculator" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-white">Kalkulator IP & Subnetting</h3>
+                    <p class="text-[11px] text-slate-400">Hitung segmen jaringan secara instan untuk tugas sekolah / praktikum.</p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div class="sm:col-span-2 space-y-1">
+                    <label class="text-[11px] text-slate-400 font-semibold uppercase font-mono tracking-wider">IP Address</label>
+                    <input type="text" id="calcIpInput" value="192.168.1.1" placeholder="Contoh: 192.168.1.1" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-850 rounded-2xl outline-none focus:border-cyan-500 text-sm font-mono text-white">
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-[11px] text-slate-400 font-semibold uppercase font-mono tracking-wider">CIDR / Prefix</label>
+                    <select id="calcPrefixSelect" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-850 rounded-2xl outline-none focus:border-cyan-500 text-sm font-mono text-white">
+                      ${Array.from({ length: 25 }, (_, i) => 8 + i).map(p => `<option value="${p}" ${p === 24 ? 'selected' : ''}>/${p}</option>`).join("")}
+                    </select>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-1">
+                      <span class="text-[10px] text-slate-500 font-mono block">SUBNET MASK</span>
+                      <span class="text-xs font-bold text-cyan-400 font-mono" id="resSubnet">255.255.255.0</span>
+                    </div>
+                    <div class="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-1">
+                      <span class="text-[10px] text-slate-500 font-mono block">WILDCARD MASK</span>
+                      <span class="text-xs font-bold text-amber-500 font-mono" id="resWildcard">0.0.0.255</span>
+                    </div>
+                  </div>
+
+                  <div class="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-slate-400 font-mono">NETWORK ADDRESS</span>
+                      <span class="font-bold text-white font-mono" id="resNetwork">192.168.1.0</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-850/60">
+                      <span class="text-slate-400 font-mono">BROADCAST ADDRESS</span>
+                      <span class="font-bold text-white font-mono" id="resBroadcast">192.168.1.255</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-850/60">
+                      <span class="text-slate-400 font-mono">IP USABLE RANGE</span>
+                      <span class="font-bold text-emerald-400 font-mono text-[11px]" id="resRange">192.168.1.1 - 192.168.1.254</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-850/60">
+                      <span class="text-slate-400 font-mono">TOTAL HOSTS</span>
+                      <span class="font-bold text-cyan-400 font-mono" id="resHosts">254 usable</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-850/60">
+                      <span class="text-slate-400 font-mono">NETWORK CLASS</span>
+                      <span class="font-bold text-purple-400 font-mono" id="resClass">Class C</span>
+                    </div>
+                  </div>
+
+                  <!-- Binary Representation for Exam Preparation -->
+                  <div class="p-4 bg-slate-950/60 rounded-2xl border border-slate-850 space-y-2.5">
+                    <span class="text-[10px] text-slate-400 font-bold font-mono tracking-wider flex items-center gap-1">
+                      <i data-lucide="binary" class="w-3.5 h-3.5 text-cyan-400"></i> VISUALISASI BINER (SANGAT BERGUNA UNTUK UJIAN)
+                    </span>
+                    <div class="space-y-1 text-[10px] font-mono leading-relaxed">
+                      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <span class="text-slate-500 font-semibold">IP ADDRESS:</span>
+                        <span class="text-slate-300 tracking-wider" id="binIp">11000000.10101000.00000001.00000001</span>
+                      </div>
+                      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-1 border-t border-slate-850/30">
+                        <span class="text-slate-500 font-semibold">SUBNET MASK:</span>
+                        <span class="text-slate-300 tracking-wider" id="binMask">11111111.11111111.11111111.00000000</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cheat Sheet (Right - 5 cols) -->
+              <div class="lg:col-span-5 glass rounded-3xl p-6 border border-slate-850 flex flex-col justify-between space-y-4">
+                <div class="space-y-4">
+                  <div class="flex items-center gap-2 border-b border-slate-800 pb-4">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
+                      <i data-lucide="terminal" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-bold text-white">Cheat Sheet Perintah</h3>
+                      <p class="text-[11px] text-slate-400">Catatan konfigurasi cepat Cisco IOS & Mikrotik.</p>
+                    </div>
+                  </div>
+
+                  <!-- Sub-tabs for Cheat Sheet -->
+                  <div class="flex border border-slate-850 bg-slate-950 p-1 rounded-xl">
+                    <button id="csCiscoTabBtn" class="flex-1 py-1.5 text-center text-xs font-bold rounded-lg bg-cyan-500 text-slate-950 transition-all cursor-pointer">Cisco IOS</button>
+                    <button id="csMikrotikTabBtn" class="flex-1 py-1.5 text-center text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-all cursor-pointer">Mikrotik RouterOS</button>
+                  </div>
+
+                  <!-- Sheet Content Area -->
+                  <div id="csContentArea" class="h-[250px] overflow-y-auto space-y-3 pr-1 text-xs">
+                    <!-- Default: Cisco Commands -->
+                    <div class="space-y-3" id="ciscoCommands">
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-cyan-400 text-[11px] font-mono">1. Konfigurasi Dasar (Basic IP)</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">Router> enable
+Router# configure terminal
+Router(config)# interface gig0/0
+Router(config-if)# ip address 192.168.1.1 255.255.255.0
+Router(config-if)# no shutdown</pre>
+                      </div>
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-cyan-400 text-[11px] font-mono">2. VLAN & Trunking</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">Switch# configure terminal
+Switch(config)# vlan 10
+Switch(config-vlan)# name GURU
+Switch(config)# interface fast0/1
+Switch(config-if)# switchport mode access
+Switch(config-if)# switchport access vlan 10</pre>
+                      </div>
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-cyan-400 text-[11px] font-mono">3. Routing RIP</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">Router(config)# router rip
+Router(config-router)# version 2
+Router(config-router)# network 192.168.1.0
+Router(config-router)# network 10.0.0.0</pre>
+                      </div>
+                    </div>
+
+                    <!-- Mikrotik Commands (Hidden initially) -->
+                    <div class="space-y-3 hidden" id="mikrotikCommands">
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-purple-400 text-[11px] font-mono">1. Konfigurasi IP Address</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">/ip address add address=192.168.1.1/24 interface=ether1</pre>
+                      </div>
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-purple-400 text-[11px] font-mono">2. Internet Gateway (NAT Masquerade)</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">/ip route add gateway=192.168.1.254
+/ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
+/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade</pre>
+                      </div>
+                      <div class="p-3 bg-slate-950/40 rounded-xl border border-slate-850">
+                        <h4 class="font-bold text-purple-400 text-[11px] font-mono">3. Konfigurasi DHCP Server</h4>
+                        <pre class="bg-slate-950 p-2 rounded-lg text-[10px] text-slate-300 font-mono mt-1 overflow-x-auto">/ip pool add name=dhcp_pool ranges=192.168.10.10-192.168.10.100
+/ip dhcp-server add name=dhcp_lokal interface=ether2 address-pool=dhcp_pool disabled=no
+/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=8.8.8.8</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-850 text-center">
+                  <span class="text-[10px] text-slate-500 font-mono block">Butuh bantuan commands lain? Silakan gunakan tab 🤖 AI Belajar di sebelah kiri!</span>
+                </div>
               </div>
             </div>
           ` : ""}
@@ -1172,6 +1335,122 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
               </div>
             </div>
           `;
+        });
+      }
+    }
+
+    // Tools Tab logic (IP & Subnet Calculator + Cheat Sheet)
+    if (activeTab === "tools") {
+      const calcIpInput = document.getElementById("calcIpInput") as HTMLInputElement;
+      const calcPrefixSelect = document.getElementById("calcPrefixSelect") as HTMLSelectElement;
+
+      const runCalculation = () => {
+        if (!calcIpInput || !calcPrefixSelect) return;
+        const ipVal = calcIpInput.value.trim();
+        const prefixVal = parseInt(calcPrefixSelect.value);
+
+        // IP Parsing logic
+        const ipParts = ipVal.split(".").map(Number);
+        if (ipParts.length !== 4 || ipParts.some(p => isNaN(p) || p < 0 || p > 255)) {
+          calcIpInput.classList.add("border-rose-500");
+          calcIpInput.classList.add("text-rose-400");
+          return;
+        }
+        calcIpInput.classList.remove("border-rose-500");
+        calcIpInput.classList.remove("text-rose-400");
+
+        // Calculations
+        const ipLong = ((ipParts[0] << 24) >>> 0) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
+        const maskLong = prefixVal === 0 ? 0 : (~0 << (32 - prefixVal)) >>> 0;
+        const wildcardLong = (~maskLong) >>> 0;
+        const netLong = (ipLong & maskLong) >>> 0;
+        const broadcastLong = (netLong | wildcardLong) >>> 0;
+
+        const longToIpStr = (long: number) => {
+          return [
+            (long >>> 24) & 255,
+            (long >>> 16) & 255,
+            (long >>> 8) & 255,
+            long & 255
+          ].join(".");
+        };
+
+        const ipToBinStr = (ip: string) => {
+          return ip.split(".").map(part => {
+            return Number(part).toString(2).padStart(8, "0");
+          }).join(".");
+        };
+
+        const subnetMaskStr = longToIpStr(maskLong);
+        const wildcardStr = longToIpStr(wildcardLong);
+        const networkStr = longToIpStr(netLong);
+        const broadcastStr = longToIpStr(broadcastLong);
+
+        // Usable hosts
+        let totalHosts = Math.pow(2, 32 - prefixVal);
+        let usableHosts = totalHosts > 2 ? totalHosts - 2 : (totalHosts === 2 ? 2 : 1);
+        let rangeStr = "";
+        if (prefixVal === 32) {
+          rangeStr = `${networkStr} (Host Tunggal)`;
+        } else if (prefixVal === 31) {
+          rangeStr = `${networkStr} - ${broadcastStr}`;
+        } else {
+          rangeStr = `${longToIpStr(netLong + 1)} - ${longToIpStr(broadcastLong - 1)}`;
+        }
+
+        // Network Class
+        let netClass = "Class A";
+        if (ipParts[0] >= 128 && ipParts[0] <= 191) netClass = "Class B";
+        else if (ipParts[0] >= 192 && ipParts[0] <= 223) netClass = "Class C";
+        else if (ipParts[0] >= 224 && ipParts[0] <= 239) netClass = "Class D (Multicast)";
+        else if (ipParts[0] >= 240) netClass = "Class E (Experimental)";
+
+        // Update DOM
+        const resSubnet = document.getElementById("resSubnet");
+        const resWildcard = document.getElementById("resWildcard");
+        const resNetwork = document.getElementById("resNetwork");
+        const resBroadcast = document.getElementById("resBroadcast");
+        const resRange = document.getElementById("resRange");
+        const resHosts = document.getElementById("resHosts");
+        const resClass = document.getElementById("resClass");
+        const binIp = document.getElementById("binIp");
+        const binMask = document.getElementById("binMask");
+
+        if (resSubnet) resSubnet.textContent = subnetMaskStr;
+        if (resWildcard) resWildcard.textContent = wildcardStr;
+        if (resNetwork) resNetwork.textContent = networkStr;
+        if (resBroadcast) resBroadcast.textContent = broadcastStr;
+        if (resRange) resRange.textContent = rangeStr;
+        if (resHosts) resHosts.textContent = `${usableHosts.toLocaleString()} usable hosts`;
+        if (resClass) resClass.textContent = `${netClass}`;
+        if (binIp) binIp.textContent = ipToBinStr(ipVal);
+        if (binMask) binMask.textContent = ipToBinStr(subnetMaskStr);
+      };
+
+      calcIpInput.addEventListener("input", runCalculation);
+      calcPrefixSelect.addEventListener("change", runCalculation);
+      // Run initial
+      runCalculation();
+
+      // Cheat Sheet toggle
+      const csCiscoTabBtn = document.getElementById("csCiscoTabBtn");
+      const csMikrotikTabBtn = document.getElementById("csMikrotikTabBtn");
+      const ciscoCommands = document.getElementById("ciscoCommands");
+      const mikrotikCommands = document.getElementById("mikrotikCommands");
+
+      if (csCiscoTabBtn && csMikrotikTabBtn && ciscoCommands && mikrotikCommands) {
+        csCiscoTabBtn.addEventListener("click", () => {
+          csCiscoTabBtn.className = "flex-1 py-1.5 text-center text-xs font-bold rounded-lg bg-cyan-500 text-slate-950 transition-all cursor-pointer";
+          csMikrotikTabBtn.className = "flex-1 py-1.5 text-center text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-all cursor-pointer";
+          ciscoCommands.classList.remove("hidden");
+          mikrotikCommands.classList.add("hidden");
+        });
+
+        csMikrotikTabBtn.addEventListener("click", () => {
+          csMikrotikTabBtn.className = "flex-1 py-1.5 text-center text-xs font-bold rounded-lg bg-cyan-500 text-slate-950 transition-all cursor-pointer";
+          csCiscoTabBtn.className = "flex-1 py-1.5 text-center text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-all cursor-pointer";
+          mikrotikCommands.classList.remove("hidden");
+          ciscoCommands.classList.add("hidden");
         });
       }
     }
