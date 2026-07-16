@@ -189,17 +189,17 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
             background: "#0f172a",
             color: "#f8fafc",
             html: `
-              <div class="space-y-4 text-left mt-4 font-sans max-h-[400px] overflow-y-auto pr-1">
+              <div class="space-y-4 text-left mt-4 font-sans max-h-[420px] overflow-y-auto pr-1">
                 <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
                   <span class="text-xs font-bold text-cyan-400 block">Metode Pembagian</span>
                   <select id="gmMethod" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
-                    <option value="groupCount">Berdasarkan Jumlah Kelompok (Misal: dibagi jadi 4 kelompok)</option>
-                    <option value="memberCount">Berdasarkan Anggota per Kelompok (Misal: 4 orang per kelompok)</option>
+                    <option value="groupCount">Berdasarkan Jumlah Kelompok (Misal: dibagi jadi X kelompok)</option>
+                    <option value="memberCount">Berdasarkan Anggota per Kelompok (Misal: X orang per kelompok)</option>
                   </select>
                 </div>
 
                 <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
-                  <span class="text-xs font-bold text-cyan-400 block">Nilai Pembagi (2-8)</span>
+                  <span class="text-xs font-bold text-cyan-400 block">Nilai Pembagi (2-12)</span>
                   <select id="gmValue" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-xs outline-none focus:border-cyan-500">
                     <option value="2">2</option>
                     <option value="3">3</option>
@@ -208,7 +208,16 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
                     <option value="6">6</option>
                     <option value="7">7</option>
                     <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
                   </select>
+                </div>
+
+                <!-- Live Simulation Preview Panel -->
+                <div id="gmSummaryPreview" class="p-3.5 bg-sky-950/25 border border-sky-500/20 rounded-xl space-y-1">
+                  <!-- Will be filled dynamically by JavaScript -->
                 </div>
 
                 <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5">
@@ -242,8 +251,78 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
                     cb.checked = !allChecked;
                   });
                   toggleBtn.innerText = allChecked ? "Pilih Semua" : "Kosongkan Semua";
+                  updateGmPreview();
                 });
               }
+
+              const updateGmPreview = () => {
+                const previewEl = document.getElementById("gmSummaryPreview");
+                if (!previewEl) return;
+
+                const method = (document.getElementById("gmMethod") as HTMLSelectElement).value;
+                const value = parseInt((document.getElementById("gmValue") as HTMLSelectElement).value) || 4;
+                const checkedBoxes = document.querySelectorAll("input[name='gmStudentCheck']:checked") as NodeListOf<HTMLInputElement>;
+                const N = checkedBoxes.length;
+
+                if (N === 0) {
+                  previewEl.innerHTML = `
+                    <div class="flex items-center gap-2 text-rose-400 text-xs">
+                      <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                      <span>Harap pilih minimal 1 siswa di daftar bawah!</span>
+                    </div>
+                  `;
+                  renderIcons();
+                  return;
+                }
+
+                let numGroups = 1;
+                if (method === "groupCount") {
+                  numGroups = Math.min(value, N);
+                } else {
+                  numGroups = Math.max(1, Math.ceil(N / value));
+                }
+
+                const minSize = Math.floor(N / numGroups);
+                const numMaxGroups = N % numGroups;
+                const numMinGroups = numGroups - numMaxGroups;
+
+                let rincian = "";
+                if (numMaxGroups === 0) {
+                  rincian = `Semua ${numGroups} kelompok masing-masing berisi ${minSize} anggota.`;
+                } else {
+                  rincian = `${numMaxGroups} kelompok berisi ${minSize + 1} anggota, dan ${numMinGroups} kelompok berisi ${minSize} anggota.`;
+                }
+
+                previewEl.innerHTML = `
+                  <div class="space-y-1 text-[11px] font-sans">
+                    <div class="font-bold text-cyan-300 flex items-center gap-1.5">
+                      <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+                      Simulasi Pembagian Kelompok
+                    </div>
+                    <p class="text-slate-300 leading-snug">
+                      Akan membagi <span class="text-white font-bold">${N} siswa</span> menjadi <span class="text-white font-bold">${numGroups} kelompok</span>.
+                    </p>
+                    <p class="text-sky-300 font-mono text-[10px] leading-snug bg-sky-950/40 p-1.5 rounded border border-sky-500/10 mt-1">
+                      💡 ${rincian}
+                    </p>
+                  </div>
+                `;
+                renderIcons();
+              };
+
+              // Attach update listeners
+              const gmMethod = document.getElementById("gmMethod") as HTMLSelectElement;
+              const gmValue = document.getElementById("gmValue") as HTMLSelectElement;
+              if (gmMethod) gmMethod.addEventListener("change", updateGmPreview);
+              if (gmValue) gmValue.addEventListener("change", updateGmPreview);
+              
+              const studentChecks = document.querySelectorAll("input[name='gmStudentCheck']");
+              studentChecks.forEach((cb) => {
+                cb.addEventListener("change", updateGmPreview);
+              });
+
+              // Initial trigger
+              updateGmPreview();
             },
             preConfirm: () => {
               const method = (document.getElementById("gmMethod") as HTMLSelectElement).value;
@@ -286,22 +365,47 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
                 groups[index % numGroups].push(student);
               });
 
+              // Construct rincian penjelasan kelompok
+              const minSize = Math.floor(numStudents / numGroups);
+              const numMaxGroups = numStudents % numGroups;
+              const numMinGroups = numGroups - numMaxGroups;
+              let rincianText = "";
+              if (numMaxGroups === 0) {
+                rincianText = `Semua ${numGroups} kelompok masing-masing berisi ${minSize} anggota.`;
+              } else {
+                rincianText = `${numMaxGroups} kelompok berisi ${minSize + 1} anggota, dan ${numMinGroups} kelompok berisi ${minSize} anggota.`;
+              }
+
               let outputHtml = `<div class="space-y-4 text-left mt-2 max-h-[350px] overflow-y-auto pr-1 font-sans">`;
+              outputHtml += `
+                <div class="p-3 bg-cyan-950/30 border border-cyan-800/30 rounded-2xl space-y-1.5">
+                  <span class="text-xs font-bold text-cyan-400 block uppercase tracking-wider">📋 Rincian Pembagian</span>
+                  <p class="text-slate-300 text-xs">
+                    Total <strong class="text-white">${numStudents} siswa</strong> dibagi menjadi <strong class="text-white">${numGroups} kelompok</strong>.
+                  </p>
+                  <p class="text-[11px] text-slate-400 font-mono leading-relaxed bg-slate-950/40 p-2 rounded border border-slate-800">
+                    💡 ${rincianText}
+                  </p>
+                </div>
+              `;
+
               let outputText = `📌 HASIL PEMBAGIAN KELOMPOK XII TKJ 1\n`;
-              outputText += `Dibuat secara acak otomatis pada: ${new Date().toLocaleString("id-ID")}\n\n`;
+              outputText += `Dibuat secara acak otomatis pada: ${new Date().toLocaleString("id-ID")}\n`;
+              outputText += `Ringkasan: ${numStudents} siswa dibagi menjadi ${numGroups} kelompok.\n`;
+              outputText += `Rincian: ${rincianText}\n\n`;
 
               groups.forEach((group, idx) => {
                 const groupNum = idx + 1;
                 outputHtml += `
                   <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl border-l-4 border-l-cyan-500 space-y-1.5">
-                    <span class="text-xs font-bold text-cyan-400 block uppercase tracking-wider">Kelompok ${groupNum} (${group.length} Siswa)</span>
+                    <span class="text-xs font-bold text-cyan-400 block uppercase tracking-wider">Kelompok ${groupNum} (${group.length} Anggota)</span>
                     <div class="grid grid-cols-1 gap-1 text-[11px] text-slate-300">
                       ${group.map((s, i) => `<div>${i + 1}. ${s.name}</div>`).join("")}
                     </div>
                   </div>
                 `;
 
-                outputText += `• Kelompok ${groupNum}:\n`;
+                outputText += `• Kelompok ${groupNum} (${group.length} Anggota):\n`;
                 group.forEach((s, i) => {
                   outputText += `  ${i + 1}. ${s.name}\n`;
                 });

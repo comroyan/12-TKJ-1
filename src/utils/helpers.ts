@@ -461,3 +461,54 @@ export async function uploadFileToServer(
   }
 }
 
+// Browser System Notification Helpers
+export function sendLocalSystemNotification(title: string, body: string) {
+  if (!("Notification" in window)) {
+    console.warn("Browser ini tidak mendukung notifikasi sistem.");
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    try {
+      const options = {
+        body,
+        icon: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=128&h=128&fit=crop",
+        badge: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=128&h=128&fit=crop",
+        vibrate: [200, 100, 200]
+      };
+      new Notification(title, options);
+    } catch (e) {
+      console.warn("Gagal menampilkan notifikasi sistem:", e);
+    }
+  }
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!("Notification" in window)) {
+    toast.error("Browser Anda tidak mendukung notifikasi sistem.");
+    return false;
+  }
+
+  try {
+    const permission = await Notification.permission;
+    if (permission === "granted") {
+      toast.success("Notifikasi sistem HP/Desktop sudah aktif! 🎉");
+      sendLocalSystemNotification("Notifikasi Aktif!", "Anda akan menerima pengumuman penting XII TKJ 1 langsung di layar HP/Desktop Anda.");
+      return true;
+    }
+
+    const requested = await Notification.requestPermission();
+    if (requested === "granted") {
+      toast.success("Notifikasi sistem HP/Desktop berhasil diaktifkan! 🎉");
+      sendLocalSystemNotification("Notifikasi Aktif!", "Anda akan menerima pengumuman penting XII TKJ 1 langsung di layar HP/Desktop Anda.");
+      return true;
+    } else {
+      toast.info("Izin notifikasi ditolak atau diblokir. Silakan aktifkan izin notifikasi di setelan browser Anda.");
+      return false;
+    }
+  } catch (err: any) {
+    console.error("Gagal meminta izin notifikasi:", err);
+    return false;
+  }
+}
+

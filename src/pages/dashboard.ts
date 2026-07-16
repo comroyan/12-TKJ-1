@@ -8,7 +8,7 @@ import {
   getCountdownSettings,
   saveCountdownSettings
 } from "../firebase/db";
-import { formatRupiah, renderIcons, isOddWeek, toast } from "../utils/helpers";
+import { formatRupiah, renderIcons, isOddWeek, toast, requestNotificationPermission } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderDashboard(container: HTMLElement, userSession: any) {
@@ -122,6 +122,24 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
           </div>
         </div>
       </div>
+
+      <!-- Notification Activation Banner if not granted -->
+      ${("Notification" in window && Notification.permission !== "granted") ? `
+        <div id="notifPermissionBanner" class="p-4 bg-sky-500/10 border border-sky-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-sky-500/20 text-sky-400 rounded-xl">
+              <i data-lucide="bell" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-white">Aktifkan Notifikasi Sistem HP</h3>
+              <p class="text-[10px] text-slate-400 mt-0.5">Dapatkan pengumuman penting XII TKJ 1 langsung di layar HP/Desktop Anda.</p>
+            </div>
+          </div>
+          <button id="enableNotifBtn" class="w-full sm:w-auto px-4 py-1.5 bg-sky-500 hover:bg-sky-600 text-slate-950 font-bold text-xs rounded-xl transition-all whitespace-nowrap">
+            Aktifkan Sekarang
+          </button>
+        </div>
+      ` : ""}
 
       <!-- Quick Countdown Grid Section with Ketua Kelas Edit Action -->
       <div class="space-y-3">
@@ -523,4 +541,18 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     }
   };
   updatePingMetric();
+
+  // Notification activation listener
+  const enableNotifBtn = document.getElementById("enableNotifBtn");
+  if (enableNotifBtn) {
+    enableNotifBtn.addEventListener("click", async () => {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        const banner = document.getElementById("notifPermissionBanner");
+        if (banner) {
+          banner.style.display = "none";
+        }
+      }
+    });
+  }
 }

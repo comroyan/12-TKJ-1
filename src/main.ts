@@ -11,7 +11,7 @@ import {
   logoutUser, 
   UserSession 
 } from "./firebase/auth";
-import { renderIcons, toast } from "./utils/helpers";
+import { renderIcons, toast, sendLocalSystemNotification, requestNotificationPermission } from "./utils/helpers";
 import { createStudentUser } from "./firebase/db";
 
 // Import Page Renderers
@@ -623,6 +623,7 @@ async function renderMainLayout() {
       if (change.type === "added") {
         const notif = change.doc.data();
         toast.info(`📢 ${notif.title || 'Pengumuman'}\n${notif.content || ''}`);
+        sendLocalSystemNotification(notif.title || "Pengumuman Kelas 📢", notif.content || "");
       }
     });
   });
