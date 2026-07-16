@@ -18,16 +18,25 @@ const SHOP_ITEMS: ShopItem[] = [
   { id: "av_splicer", name: "Fiber Optic Master Splicer", cost: 500, type: "avatar", preview: "https://images.unsplash.com/photo-1600132806370-bf17e65e942f?w=120&h=120&fit=crop" },
   { id: "av_ai_hacker", name: "AI Cybernetist Hacker Avatar", cost: 400, type: "avatar", preview: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop" },
   { id: "av_datacenter", name: "NOC Data Center Master Avatar", cost: 650, type: "avatar", preview: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=120&h=120&fit=crop" },
+  { id: "av_ghost", name: "🎭 Anonymous Ghost Protocol Avatar (Epic)", cost: 800, type: "avatar", preview: "https://images.unsplash.com/photo-1563089145-599997674d42?w=120&h=120&fit=crop" },
+  { id: "av_neon_phoenix", name: "🐦 Neon Cyber Phoenix Avatar (Legendary)", cost: 1100, type: "avatar", preview: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=120&h=120&fit=crop" },
   { id: "fr_neon", name: "Cyberpunk Neon Frame", cost: 150, type: "frame", preview: "ring-4 ring-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.6)]" },
   { id: "fr_matrix", name: "Matrix Green Rain Frame", cost: 250, type: "frame", preview: "ring-4 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)] animate-pulse" },
   { id: "fr_gold", name: "Golden Network Master Frame", cost: 300, type: "frame", preview: "ring-4 ring-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)]" },
   { id: "fr_solar", name: "Solar Plasma Flare Frame", cost: 500, type: "frame", preview: "ring-4 ring-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.7)]" },
+  { id: "fr_rainbow", name: "🌈 RGB Gaming Streamer Frame (Epic)", cost: 850, type: "frame", preview: "ring-4 ring-pink-500 shadow-[0_0_25px_rgba(236,72,153,0.8)] animate-pulse" },
   { id: "fr_dark_matter", name: "Dark Matter Eclipse Frame", cost: 750, type: "frame", preview: "ring-4 ring-purple-600 shadow-[0_0_25px_rgba(147,51,234,0.9)] animate-pulse" },
+  { id: "fr_quantum", name: "🌀 Quantum Portal Pulsar Frame (Mythic)", cost: 1400, type: "frame", preview: "ring-4 ring-fuchsia-500 shadow-[0_0_30px_rgba(217,70,239,0.9)] animate-bounce" },
+  { id: "bg_matrix_rain", name: "📟 Matrix Digital Rain Theme Background", cost: 400, type: "wallpaper", preview: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=800&fit=crop" },
+  { id: "bg_neon_grid", name: "🌌 Retro Synthwave Neon Grid Background", cost: 600, type: "wallpaper", preview: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=1200&h=800&fit=crop" },
+  { id: "bg_cyber_tokyo", name: "🌆 Cyberpunk Tokyo NOC Console Background", cost: 750, type: "wallpaper", preview: "https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?w=1200&h=800&fit=crop" },
   { id: "bd_ping", name: "⚡ Ping Master 1ms Badge", cost: 300, type: "badge", preview: "⚡ Ping Master" },
   { id: "bd_genius", name: "🧠 Genius TKJ Badge", cost: 400, type: "badge", preview: "🧠 Genius TKJ" },
   { id: "bd_legend", name: "👑 Sysadmin Legend Badge", cost: 600, type: "badge", preview: "👑 Sysadmin Legend" },
+  { id: "bd_ddos", name: "🛡️ DDoS Immune Specialist Badge", cost: 800, type: "badge", preview: "🛡️ DDoS Specialist" },
   { id: "bd_linus", name: "🐧 Linux Kernel Contributor Badge", cost: 700, type: "badge", preview: "🐧 Kernel Contributor" },
-  { id: "bd_godmode", name: "👑 Network Overlord Badge", cost: 999, type: "badge", preview: "👑 Network Overlord" }
+  { id: "bd_godmode", name: "👑 Network Overlord Badge", cost: 999, type: "badge", preview: "👑 Network Overlord" },
+  { id: "bd_dewa_tkj", name: "👑 DEWA JARINGAN (GOD MODE) Badge", cost: 1800, type: "badge", preview: "👑 DEWA JARINGAN" }
 ];
 
 // Sample Quiz Database for Games
@@ -149,7 +158,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
   `;
 
   let activeTab = "games"; // games, shop, leaderboard
-  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | null = null;
+  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | "flappy_packet" | null = null;
 
   const isKetuaKelas = userSession.role === "Super Admin" || 
                        userSession.role === "Ketua Kelas" || 
@@ -165,6 +174,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
   let inventory: string[] = [];
   let equippedAvatar = "";
   let equippedFrame = "";
+  let equippedWallpaper = "";
 
   async function loadGameProfile() {
     try {
@@ -178,6 +188,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
         inventory = data.inventory || [];
         equippedAvatar = data.equippedAvatar || "";
         equippedFrame = data.equippedFrame || "";
+        equippedWallpaper = data.equippedWallpaper || "";
       } else {
         // Init profile
         await setDoc(doc(db, "gameData", userSession.uid), {
@@ -190,6 +201,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
           inventory: [],
           equippedAvatar: "",
           equippedFrame: "",
+          equippedWallpaper: "",
           updatedAt: new Date()
         });
         xp = 10;
@@ -199,6 +211,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
         inventory = [];
         equippedAvatar = "";
         equippedFrame = "";
+        equippedWallpaper = "";
       }
 
       renderUI();
@@ -220,6 +233,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
         inventory,
         equippedAvatar,
         equippedFrame,
+        equippedWallpaper,
         updatedAt: new Date()
       }, { merge: true });
     } catch (e) {
@@ -276,9 +290,10 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
     // Generate equipped styles
     const avatarUrl = equippedAvatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop";
     const frameClass = equippedFrame || "border border-slate-800";
+    const wallpaperStyle = equippedWallpaper ? `style="background-image: linear-gradient(to bottom, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.95)), url('${equippedWallpaper}'); background-size: cover; background-position: center; background-attachment: fixed; padding: 24px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.05);"` : "";
 
     container.innerHTML = `
-      <div class="space-y-6 animate-fadeIn text-slate-100 font-sans max-w-5xl mx-auto">
+      <div ${wallpaperStyle} class="space-y-6 animate-fadeIn text-slate-100 font-sans max-w-5xl mx-auto">
         
         <!-- Game Profile Header Stats -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-6 glass rounded-3xl relative overflow-hidden bg-slate-900/40 border border-slate-800">
@@ -451,6 +466,20 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                     Akses Terminal 💻
                   </button>
                 </div>
+
+                <!-- Game 8: Flappy Packet -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-yellow-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center text-xl">
+                      <i data-lucide="send" class="w-6 h-6 animate-pulse"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">Flappy Packet (Lompatan Data)</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Luncurkan paket data TCP/IP melewati rintangan Firewall dan Router Gateway tanpa menabrak! Uji fokus dan refleksmu.</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="flappy_packet">
+                    Luncurkan Paket ⚡
+                  </button>
+                </div>
               </div>
             ` : ""}
 
@@ -487,7 +516,8 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         ${ownedItems.map(item => {
                           const isEquipped = (item.type === "avatar" && equippedAvatar === item.preview) || 
-                                             (item.type === "frame" && equippedFrame === item.preview);
+                                             (item.type === "frame" && equippedFrame === item.preview) ||
+                                             ((item.type === "wallpaper" || item.type === "theme") && equippedWallpaper === item.preview);
 
                           return `
                             <div class="p-4 glass rounded-2xl flex flex-col justify-between border border-emerald-500/10 bg-slate-950/30 hover:border-emerald-500/30 transition-all relative">
@@ -500,6 +530,13 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                                 ` : item.type === 'frame' ? `
                                   <div class="w-12 h-12 rounded-lg mx-auto bg-slate-900 flex items-center justify-center border border-slate-800 ${item.preview}">
                                     <span class="text-[8px] text-cyan-400 font-mono font-bold">FRAME</span>
+                                  </div>
+                                ` : item.type === 'wallpaper' || item.type === 'theme' ? `
+                                  <div class="w-24 h-12 rounded mx-auto overflow-hidden border border-slate-800 relative">
+                                    <img src="${item.preview}" class="w-full h-full object-cover">
+                                    <div class="absolute inset-0 bg-slate-950/20 flex items-center justify-center">
+                                      <i data-lucide="image" class="w-3 h-3 text-white/75"></i>
+                                    </div>
                                   </div>
                                 ` : `
                                   <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-[9px] text-cyan-400 font-mono font-bold inline-block">
@@ -561,6 +598,10 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                             ` : item.type === 'frame' ? `
                               <div class="w-12 h-12 rounded-lg mx-auto bg-slate-900 flex items-center justify-center border border-slate-850 ${item.preview}">
                                 <span class="text-[8px] text-cyan-400 font-mono font-bold">FRAME</span>
+                              </div>
+                            ` : item.type === 'wallpaper' || item.type === 'theme' ? `
+                              <div class="w-24 h-12 rounded mx-auto overflow-hidden border border-slate-800 relative">
+                                <img src="${item.preview}" class="w-full h-full object-cover">
                               </div>
                             ` : `
                               <div class="px-2.5 py-1 rounded bg-slate-900 border border-slate-850 font-bold text-[9px] text-cyan-400 inline-block font-mono">
@@ -701,6 +742,8 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
           equippedAvatar = equippedAvatar === preview ? "" : preview;
         } else if (type === "frame") {
           equippedFrame = equippedFrame === preview ? "" : preview;
+        } else if (type === "wallpaper" || type === "theme") {
+          equippedWallpaper = equippedWallpaper === preview ? "" : preview;
         }
 
         await saveGameProfile();
@@ -799,6 +842,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                   inventory: [],
                   equippedAvatar: "",
                   equippedFrame: "",
+                  equippedWallpaper: "",
                   updatedAt: new Date()
                 });
 
@@ -814,6 +858,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                   inventory = [];
                   equippedAvatar = "";
                   equippedFrame = "";
+                  equippedWallpaper = "";
                 }
 
                 renderUI().then(() => {
@@ -850,6 +895,8 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
       initPortDefenseGame(playground);
     } else if (activeGame === "terminal_hacker") {
       initTerminalHackerGame(playground);
+    } else if (activeGame === "flappy_packet") {
+      initFlappyPacketGame(playground);
     }
   }
 
@@ -2712,6 +2759,498 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
           renderUI();
         });
       }
+    }
+
+    renderIntro();
+  }
+
+  // -------------------------------------------------------------
+  // GAME 8: FLAPPY PACKET (LOMPATAN DATA JARINGAN)
+  // -------------------------------------------------------------
+  function initFlappyPacketGame(p: HTMLElement) {
+    let score = 0;
+    let highscore = 0;
+    let gameActive = false;
+    let gameLoopId: any = null;
+    let packetY = 200;
+    let packetVelocity = 0;
+    const packetGravity = 0.28;
+    const packetJump = -5.5;
+    const packetX = 120;
+    const packetRadius = 8;
+    
+    interface Pipe {
+      x: number;
+      topHeight: number;
+      bottomHeight: number;
+      width: number;
+      passed: boolean;
+      label: string;
+    }
+    
+    interface ByteCoin {
+      x: number;
+      y: number;
+      collected: boolean;
+      pulse: number;
+    }
+
+    let pipes: Pipe[] = [];
+    let coinsList: ByteCoin[] = [];
+    const pipeWidth = 55;
+    const gapHeight = 115;
+    const pipeSpeed = 2.0;
+    let framesCount = 0;
+    
+    // Trail of packet data
+    let trail: {x: number, y: number, alpha: number}[] = [];
+
+    const obstacleLabels = [
+      "FIREWALL BLOCKED",
+      "PORT 80 FILTER",
+      "ROUTER IP GATEWAY",
+      "DDoS DEFENSE",
+      "PROXY RESTRICTION",
+      "SWITCH VLAN",
+      "NAT TRANSITION"
+    ];
+
+    function renderIntro() {
+      p.innerHTML = `
+        <div class="max-w-xl mx-auto p-6 glass rounded-3xl border border-slate-850 space-y-6 text-center animate-fadeIn">
+          <div class="w-16 h-16 rounded-2xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center mx-auto text-3xl">
+            <i data-lucide="send" class="w-8 h-8"></i>
+          </div>
+          
+          <div class="space-y-2">
+            <h3 class="text-xl font-extrabold text-white">Flappy Packet</h3>
+            <p class="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
+              Kendalikan paket data internet TCP/IP melewati gerbang router, switch, dan filter firewall tanpa menabrak! Kumpulkan kepingan byte emas untuk bonus skor.
+            </p>
+          </div>
+
+          <div class="p-4 bg-slate-950/50 rounded-2xl border border-slate-850/80 text-left space-y-3 font-sans">
+            <h4 class="text-xs font-bold text-slate-300 flex items-center gap-1">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-yellow-400"></i> Panduan Bermain:
+            </h4>
+            <ul class="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside">
+              <li>Tekan tombol <strong class="text-white">[ Spacebar ]</strong> atau <strong class="text-white">[ Klik Layar ]</strong> untuk meluncurkan paket data ke atas.</li>
+              <li>Jangan biarkan paket terjatuh ke bawah tanah atau menabrak dinding rintangan!</li>
+              <li>Lolos rintangan memberikan <strong class="text-emerald-400">+10 Skor</strong>.</li>
+              <li>Ambil partikel <strong class="text-yellow-400">Byte Koin (Disk Kuning)</strong> untuk bonus <strong class="text-yellow-400">+5 Skor & +1 Koin Emas</strong> langsung!</li>
+            </ul>
+          </div>
+
+          <button id="startFlappyBtn" class="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-2xl text-xs tracking-wider transition-all cursor-pointer">
+            LUNCURKAN ALIRAN DATA ⚡
+          </button>
+        </div>
+      `;
+
+      renderIcons();
+
+      const btn = document.getElementById("startFlappyBtn");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          playRetroSound("click");
+          startGame();
+        });
+      }
+    }
+
+    function startGame() {
+      score = 0;
+      gameActive = true;
+      packetY = 180;
+      packetVelocity = 0;
+      pipes = [];
+      coinsList = [];
+      trail = [];
+      framesCount = 0;
+      
+      // Add first pipe
+      spawnPipe(550);
+      spawnPipe(800);
+
+      renderPlayground();
+    }
+
+    function spawnPipe(startX: number) {
+      const minHeight = 50;
+      const maxHeight = 230;
+      const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+      const label = obstacleLabels[Math.floor(Math.random() * obstacleLabels.length)];
+      
+      pipes.push({
+        x: startX,
+        topHeight: topHeight,
+        bottomHeight: 400 - topHeight - gapHeight,
+        width: pipeWidth,
+        passed: false,
+        label: label
+      });
+
+      // 50% chance to spawn a coin in the center gap
+      if (Math.random() > 0.4) {
+        coinsList.push({
+          x: startX + pipeWidth / 2,
+          y: topHeight + gapHeight / 2,
+          collected: false,
+          pulse: 0
+        });
+      }
+    }
+
+    function renderPlayground() {
+      p.innerHTML = `
+        <div class="max-w-2xl mx-auto space-y-4 animate-fadeIn">
+          <div class="flex items-center justify-between text-xs font-mono px-2">
+            <div class="flex items-center gap-4">
+              <span class="text-slate-400">SKOR: <strong class="text-yellow-400 text-sm font-bold font-mono" id="flappyScore">0</strong></span>
+              <span class="text-slate-400">TERBAIK: <strong class="text-cyan-400 text-sm font-bold font-mono" id="flappyHigh">0</strong></span>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 uppercase tracking-wider animate-pulse text-[10px] flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> LINE ONLINE
+            </span>
+          </div>
+
+          <!-- CANVAS AREA -->
+          <div class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl">
+            <canvas id="flappyCanvas" width="600" height="400" class="w-full max-h-[360px] block cursor-pointer"></canvas>
+            
+            <div id="canvasOverlay" class="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center space-y-3 hidden transition-all">
+              <div class="text-center space-y-1">
+                <h4 class="text-rose-500 font-extrabold text-lg uppercase tracking-widest font-mono">PACKET COLLISION DETECTED!</h4>
+                <p class="text-[11px] text-slate-400">Aliran data terputus di tengah jalan.</p>
+              </div>
+              <div class="flex items-center gap-4 text-xs font-mono font-bold py-2">
+                <span class="text-yellow-400">Skor: <strong class="text-base" id="overlayScore">0</strong></span>
+                <span class="text-cyan-400">Emas Didapat: <strong class="text-base" id="overlayGold">0</strong></span>
+              </div>
+              <button id="restartFlappyBtn" class="py-2.5 px-6 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer">
+                Luncurkan Ulang ⚡
+              </button>
+            </div>
+          </div>
+          
+          <p class="text-center text-[10px] text-slate-500 font-mono">Klik area game atau tekan tombol [ SPACE ] untuk mengendalikan tinggi paket data.</p>
+        </div>
+      `;
+
+      const canvas = document.getElementById("flappyCanvas") as HTMLCanvasElement;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Click/Tap inside canvas to flap
+      canvas.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (gameActive) flap();
+      });
+
+      // Spacebar to flap
+      const handleKeyPress = (e: KeyboardEvent) => {
+        if (e.code === "Space" || e.key === " ") {
+          e.preventDefault();
+          if (gameActive) flap();
+        }
+      };
+      window.addEventListener("keydown", handleKeyPress);
+
+      function flap() {
+        packetVelocity = packetJump;
+        playRetroSound("tick");
+      }
+
+      // Main Loop
+      function update() {
+        if (!gameActive) return;
+
+        framesCount++;
+        
+        // Apply Gravity
+        packetVelocity += packetGravity;
+        packetY += packetVelocity;
+
+        // Trail effect
+        trail.push({ x: packetX, y: packetY, alpha: 1.0 });
+        if (trail.length > 12) trail.shift();
+        trail.forEach(t => t.alpha -= 0.08);
+
+        // Ceiling and floor collision
+        if (packetY - packetRadius <= 0) {
+          packetY = packetRadius;
+          packetVelocity = 0;
+        }
+        if (packetY + packetRadius >= 400) {
+          handleCrash();
+          return;
+        }
+
+        // Spawn pipes
+        if (framesCount % 120 === 0) {
+          spawnPipe(650);
+        }
+
+        // Move pipes
+        for (let i = pipes.length - 1; i >= 0; i--) {
+          const pipe = pipes[i];
+          pipe.x -= pipeSpeed;
+
+          // Check if passed
+          if (!pipe.passed && pipe.x + pipe.width < packetX) {
+            pipe.passed = true;
+            score += 10;
+            playRetroSound("success");
+            const scoreEl = document.getElementById("flappyScore");
+            if (scoreEl) scoreEl.textContent = score.toString();
+          }
+
+          // Crash check
+          if (
+            packetX + packetRadius > pipe.x &&
+            packetX - packetRadius < pipe.x + pipe.width
+          ) {
+            // Collision with top pipe
+            if (packetY - packetRadius < pipe.topHeight) {
+              handleCrash();
+              return;
+            }
+            // Collision with bottom pipe
+            if (packetY + packetRadius > 400 - pipe.bottomHeight) {
+              handleCrash();
+              return;
+            }
+          }
+
+          // Remove out of bounds pipes
+          if (pipe.x + pipe.width < 0) {
+            pipes.splice(i, 1);
+          }
+        }
+
+        // Move and collect coins
+        for (let j = coinsList.length - 1; j >= 0; j--) {
+          const coin = coinsList[j];
+          coin.x -= pipeSpeed;
+          coin.pulse += 0.1;
+
+          // Collision check with coin
+          const dist = Math.hypot(coin.x - packetX, coin.y - packetY);
+          if (!coin.collected && dist < packetRadius + 12) {
+            coin.collected = true;
+            score += 5;
+            coins += 1; // Direct award of in-game coin!
+            saveGameProfile();
+            playRetroSound("coin");
+            const scoreEl = document.getElementById("flappyScore");
+            if (scoreEl) scoreEl.textContent = score.toString();
+          }
+
+          // Remove out of bounds coins
+          if (coin.x + 20 < 0) {
+            coinsList.splice(j, 1);
+          }
+        }
+
+        draw();
+        gameLoopId = requestAnimationFrame(update);
+      }
+
+      function draw() {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, 600, 400);
+
+        // 1. Draw Network Terminal Background Grid
+        ctx.strokeStyle = "rgba(34, 197, 94, 0.05)";
+        ctx.lineWidth = 1;
+        const gridSpacing = 25;
+        for (let x = 0; x < 600; x += gridSpacing) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 400);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 400; y += gridSpacing) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(600, y);
+          ctx.stroke();
+        }
+
+        // 2. Draw Packet Trail
+        trail.forEach((t) => {
+          if (t.alpha <= 0) return;
+          ctx.fillStyle = `rgba(34, 197, 94, ${t.alpha * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, packetRadius * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 3. Draw Pipes (Router Pillars / Firewall)
+        pipes.forEach((pipe) => {
+          // Top Pipe
+          const topGrad = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipe.width, 0);
+          topGrad.addColorStop(0, "#ef4444");
+          topGrad.addColorStop(0.3, "#f87171");
+          topGrad.addColorStop(1, "#991b1b");
+          
+          ctx.fillStyle = topGrad;
+          ctx.beginPath();
+          ctx.rect(pipe.x, 0, pipe.width, pipe.topHeight);
+          ctx.fill();
+          
+          // Bottom Pipe
+          const bottomGrad = ctx.createLinearGradient(pipe.x, 400 - pipe.bottomHeight, pipe.x + pipe.width, 400);
+          bottomGrad.addColorStop(0, "#ef4444");
+          bottomGrad.addColorStop(0.3, "#f87171");
+          bottomGrad.addColorStop(1, "#991b1b");
+          
+          ctx.fillStyle = bottomGrad;
+          ctx.beginPath();
+          ctx.rect(pipe.x, 400 - pipe.bottomHeight, pipe.width, pipe.bottomHeight);
+          ctx.fill();
+
+          // Border outlines
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(pipe.x, 0, pipe.width, pipe.topHeight);
+          ctx.strokeRect(pipe.x, 400 - pipe.bottomHeight, pipe.width, pipe.bottomHeight);
+
+          // Labels inside pipes
+          ctx.save();
+          ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+          ctx.font = "bold 8px monospace";
+          ctx.translate(pipe.x + pipe.width / 2, pipe.topHeight - 12);
+          ctx.rotate(-Math.PI / 2);
+          ctx.textAlign = "center";
+          ctx.fillText(pipe.label, 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+          ctx.font = "bold 8px monospace";
+          ctx.translate(pipe.x + pipe.width / 2, 400 - pipe.bottomHeight + 20);
+          ctx.rotate(-Math.PI / 2);
+          ctx.textAlign = "center";
+          ctx.fillText("SECURITY OK", 0, 0);
+          ctx.restore();
+        });
+
+        // 4. Draw Coins (Byte Particles)
+        coinsList.forEach((coin) => {
+          if (coin.collected) return;
+          const scale = 1 + Math.sin(coin.pulse) * 0.15;
+          
+          ctx.save();
+          ctx.translate(coin.x, coin.y);
+          ctx.scale(scale, scale);
+
+          // Glow effect
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#eab308";
+
+          // Core Gold Circle
+          ctx.fillStyle = "#eab308";
+          ctx.beginPath();
+          ctx.arc(0, 0, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Outer Ring
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner Bit Sign
+          ctx.fillStyle = "#000000";
+          ctx.font = "8px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("1", 0, 0);
+
+          ctx.restore();
+        });
+
+        // 5. Draw Packet (The flying TCP Circle)
+        ctx.save();
+        ctx.translate(packetX, packetY);
+
+        // Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#22c55e";
+
+        // Outer pulse circle
+        ctx.strokeStyle = "rgba(34, 197, 94, 0.4)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, packetRadius + 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Main Ball
+        const ballGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, packetRadius);
+        ballGrad.addColorStop(0, "#a7f3d0");
+        ballGrad.addColorStop(0.6, "#22c55e");
+        ballGrad.addColorStop(1, "#15803d");
+        
+        ctx.fillStyle = ballGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, packetRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Center point
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(-2, -2, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      async function handleCrash() {
+        gameActive = false;
+        playRetroSound("error");
+        
+        // Clean up event listener
+        window.removeEventListener("keydown", handleKeyPress);
+
+        // Calculate final rewards
+        const earnedXp = Math.min(50, Math.floor(score / 5) + 5);
+        const earnedCoins = Math.min(30, Math.floor(score / 12) + 2);
+
+        // Highscore
+        highscore = Math.max(highscore, score);
+        const highEl = document.getElementById("flappyHigh");
+        if (highEl) highEl.textContent = highscore.toString();
+
+        // Reveal Overlay
+        const overlay = document.getElementById("canvasOverlay");
+        if (overlay) {
+          overlay.classList.remove("hidden");
+          const overlayScore = document.getElementById("overlayScore");
+          const overlayGold = document.getElementById("overlayGold");
+          if (overlayScore) overlayScore.textContent = score.toString();
+          if (overlayGold) overlayGold.textContent = earnedCoins.toString();
+        }
+
+        // Apply awards
+        if (score > 0) {
+          await addRewards(earnedXp, earnedCoins, `Flappy Packet (${score} Poin)`);
+        }
+
+        const restartBtn = document.getElementById("restartFlappyBtn");
+        if (restartBtn) {
+          restartBtn.addEventListener("click", () => {
+            playRetroSound("click");
+            if (overlay) overlay.classList.add("hidden");
+            startGame();
+          }, { once: true });
+        }
+      }
+
+      // Initial run
+      update();
     }
 
     renderIntro();
