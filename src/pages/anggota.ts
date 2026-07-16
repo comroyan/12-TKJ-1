@@ -37,6 +37,9 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
               <i data-lucide="shuffle" class="w-4 h-4 text-cyan-400"></i> Buat Kelompok
             </button>
             ${isSAdmin ? `
+              <button id="copyCredentialsBtn" class="flex items-center gap-1.5 px-4 py-2 bg-slate-900 border border-slate-800 hover:border-yellow-500 hover:text-yellow-400 text-slate-200 font-bold rounded-xl text-sm transition-all shadow-lg shadow-yellow-500/5" title="Salin semua akun login siswa">
+                <i data-lucide="copy" class="w-4 h-4 text-yellow-500"></i> Salin Semua Akun
+              </button>
               <button id="addStudentBtn" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-2xl shadow-lg shadow-cyan-500/10 transition-all duration-300">
                 <i data-lucide="plus" class="w-4 h-4"></i> Tambah Siswa Baru
               </button>
@@ -475,6 +478,88 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
 
     // Trigger Add Student Form Modal (Super Admin only)
     if (isSAdmin) {
+      const copyCredentialsBtn = document.getElementById("copyCredentialsBtn") as HTMLButtonElement;
+      if (copyCredentialsBtn) {
+        copyCredentialsBtn.addEventListener("click", () => {
+          const sortedStudents = [...students].sort((a, b) => (a.absen || 0) - (b.absen || 0));
+
+          Swal.fire({
+            title: "Salin Semua Akun Siswa",
+            background: "#0f172a",
+            color: "#f8fafc",
+            html: `
+              <div class="space-y-4 text-left mt-3 font-sans">
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  Anda akan menyalin detail login untuk <span class="text-cyan-400 font-bold">${sortedStudents.length} siswa</span>. Harap tentukan password default yang benar di bawah ini agar format yang disalin sesuai dengan yang Anda gunakan saat mendaftarkan mereka.
+                </p>
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Password Default Siswa</label>
+                  <input type="text" id="copyDefaultPassword" value="Siswa@TKJ1_2026" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm font-mono">
+                  <p class="text-[10px] text-slate-500 mt-1">Ubah atau sesuaikan jika password default yang benar berbeda (misal: <code class="text-cyan-400">Siswa@TKJ1</code>, <code class="text-cyan-400">siswa@tkj</code>, atau lainnya).</p>
+                </div>
+              </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: "Salin Akun Sekarang",
+            cancelButtonText: "Batal",
+            confirmButtonColor: "#06b6d4",
+            cancelButtonColor: "#334155",
+            focusConfirm: false,
+            preConfirm: () => {
+              const pwd = (document.getElementById("copyDefaultPassword") as HTMLInputElement).value.trim();
+              if (!pwd) {
+                Swal.showValidationMessage("Password default tidak boleh kosong!");
+                return false;
+              }
+              return pwd;
+            }
+          }).then((res) => {
+            if (res.isConfirmed && res.value) {
+              const finalDefaultPassword = res.value;
+
+              let text = `🔑 DAFTAR LOGIN HUB KELAS XII TKJ 1\n`;
+              text += `Aplikasi: Hub XII TKJ 1\n`;
+              text += `Link Akses: ${window.location.origin}\n`;
+              text += `Password Default: ${finalDefaultPassword}\n`;
+              text += `--------------------------------------------------\n\n`;
+
+              sortedStudents.forEach((student: any) => {
+                const email = student.email || `${student.name.toLowerCase().replace(/\s+/g, "")}@classhub.local`;
+                text += `No. Absen ${student.absen || "-"}\n`;
+                text += `👤 Nama: ${student.name}\n`;
+                text += `📧 Email/Username: ${email}\n`;
+                text += `🔑 Password Default: ${finalDefaultPassword}\n`;
+                text += `--------------------------------------------------\n`;
+              });
+
+              text += `\n*Catatan: Harap segera login dan mengganti password default Anda di menu Profil demi keamanan akun Anda.*`;
+
+              navigator.clipboard.writeText(text).then(() => {
+                toast.success("Berhasil menyalin semua akun ke clipboard!");
+                Swal.fire({
+                  title: "Tersalin ke Clipboard! 🎉",
+                  background: "#0f172a",
+                  color: "#f8fafc",
+                  html: `
+                    <div class="text-left text-xs text-slate-300 space-y-2.5 mt-2">
+                      <p>Detail akun untuk <strong class="text-cyan-400">${sortedStudents.length} siswa</strong> berhasil disalin dengan password <strong class="text-yellow-400">${finalDefaultPassword}</strong>.</p>
+                      <p class="text-[11px] text-slate-400">Anda dapat langsung menempelkannya (Paste/CTRL+V) ke WhatsApp atau grup kelas untuk dibagikan.</p>
+                      <div class="p-3 bg-slate-950 border border-slate-850 rounded-xl font-mono text-[10px] leading-relaxed max-h-[160px] overflow-y-auto whitespace-pre">
+${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                      </div>
+                    </div>
+                  `,
+                  confirmButtonText: "Mantap",
+                  confirmButtonColor: "#06b6d4"
+                });
+              }).catch(err => {
+                Swal.fire("Gagal Menyalin", err.message, "error");
+              });
+            }
+          });
+        });
+      }
+
       const addStudentBtn = document.getElementById("addStudentBtn") as HTMLButtonElement;
       addStudentBtn.addEventListener("click", () => {
         Swal.fire({

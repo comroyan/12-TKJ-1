@@ -93,59 +93,31 @@ async function startServer() {
       const fileUrlLocal = `${serverOrigin}/uploads/${req.file.filename}`;
 
       if (firebaseStorage) {
-        console.log(`Mengunggah ${originalName} ke Firebase Storage dari server...`);
+        // Upload to Firebase Storage in the background (asynchronous) to not block the response
+        console.log(`Mengunggah ${originalName} ke Firebase Storage di latar belakang...`);
         const fileBuffer = fs.readFileSync(localFilePath);
         
         // Buat nama berkas unik yang aman
         const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
         const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
         
-        try {
-          // Promise-based timeout of 3.5 seconds
-          const uploadPromise = uploadBytes(storageRef, fileBuffer, { contentType: mimeType })
-            .then(async () => {
-              return await getDownloadURL(storageRef);
-            });
-            
-          const timeoutPromise = new Promise<string>((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout mengunggah ke Firebase Storage (3.5s)")), 3500)
-          );
-
-          const downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
-          console.log("Berhasil mengunggah ke Firebase Storage:", downloadUrl);
-
-          // Hapus file lokal sementara untuk hemat ruang disk
-          try {
-            fs.unlinkSync(localFilePath);
-          } catch (unlinkErr) {
-            console.warn("Gagal menghapus file sementara:", unlinkErr);
-          }
-
-          return res.json({
-            success: true,
-            fileUrl: downloadUrl,
-            fileName: originalName,
-            storage: "firebase"
+        uploadBytes(storageRef, fileBuffer, { contentType: mimeType })
+          .then(async () => {
+            const downloadUrl = await getDownloadURL(storageRef);
+            console.log("Berhasil mengunggah ke Firebase Storage di latar belakang:", downloadUrl);
+          })
+          .catch((storageErr: any) => {
+            console.warn("Gagal mengunggah ke Firebase Storage di latar belakang:", storageErr.message);
           });
-        } catch (storageErr: any) {
-          console.warn("Gagal/Timeout mengunggah ke Firebase Storage di server, menggunakan penyimpanan lokal:", storageErr);
-          // Fallback to local file URL
-          return res.json({
-            success: true,
-            fileUrl: fileUrlLocal,
-            fileName: originalName,
-            storage: "local"
-          });
-        }
-      } else {
-        console.warn("Firebase Storage tidak terkonfigurasi, beralih ke lokal.");
-        return res.json({ 
-          success: true, 
-          fileUrl: fileUrlLocal, 
-          fileName: originalName,
-          storage: "local"
-        });
       }
+
+      // Selalu kembalikan URL penyimpanan lokal secara instan (kecepatan sub-detik!)
+      return res.json({
+        success: true,
+        fileUrl: fileUrlLocal,
+        fileName: originalName,
+        storage: "local"
+      });
     } catch (error: any) {
       console.error("Upload Error:", error);
       res.status(500).json({ error: error.message || "Gagal mengunggah berkas" });

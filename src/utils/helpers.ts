@@ -322,7 +322,7 @@ export async function uploadFileToServer(
   onProgress?: (progress: number) => void
 ): Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }> {
   // 1. Try DIRECT browser-to-Firebase Storage upload FIRST
-  // This is extremely fast, avoids server routing, and displays smooth real-time progress bars natively in the browser.
+  // This is extremely fast, avoids server latency, has native client-side progress updates, and stores files permanently in the cloud.
   try {
     const { storage } = await import("../firebase/config");
     const { ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
@@ -333,11 +333,11 @@ export async function uploadFileToServer(
     return await new Promise((resolve, reject) => {
       const uploadTask = uploadBytesResumable(storageRef, file);
       
-      // Strict timeout of 35 seconds for client-to-cloud upload
+      // Strict timeout of 20 seconds for direct client-to-cloud upload (plenty for standard files)
       const storageTimeout = setTimeout(() => {
         uploadTask.cancel();
-        reject(new Error("Timeout mengunggah langsung ke Firebase Storage (35s)"));
-      }, 35000);
+        reject(new Error("Timeout mengunggah langsung ke Firebase Storage (20 detik)"));
+      }, 20000);
 
       uploadTask.on(
         "state_changed",
@@ -368,7 +368,7 @@ export async function uploadFileToServer(
       );
     });
   } catch (firebaseError: any) {
-    console.warn("Direct Firebase Storage upload skipped or failed, falling back to server upload...", firebaseError);
+    console.warn("Direct Firebase Storage upload failed or was skipped. Falling back to server upload...", firebaseError);
     
     // 2. Fallback to Server Upload
     try {
@@ -377,11 +377,11 @@ export async function uploadFileToServer(
         const formData = new FormData();
         formData.append("file", file);
 
-        // Keep server-side upload timeout much shorter (35 seconds) to avoid hanging
+        // Keep server-side fallback timeout short (15 seconds)
         const uploadTimeout = setTimeout(() => {
           xhr.abort();
-          reject(new Error("Timeout mengunggah ke server (35s)"));
-        }, 35000);
+          reject(new Error("Timeout mengunggah ke server (15 detik)"));
+        }, 15000);
 
         xhr.open("POST", getApiUrl("/api/upload"));
 
@@ -415,7 +415,7 @@ export async function uploadFileToServer(
 
         xhr.onerror = () => {
           clearTimeout(uploadTimeout);
-          reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
+          reject(new Error("Koneksi jaringan gagal saat mengunggah berkas ke server"));
         };
 
         xhr.send(formData);

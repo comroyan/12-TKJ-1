@@ -560,19 +560,19 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       const ext = file.name.split(".").pop()?.toLowerCase();
       if (["zip", "rar", "7z"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "file-archive");
-        selectedFileIcon.className = "w-5 h-5 text-yellow-500";
+        selectedFileIcon.setAttribute("class", "w-5 h-5 text-yellow-500");
       } else if (["pdf"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "file-text");
-        selectedFileIcon.className = "w-5 h-5 text-rose-500";
+        selectedFileIcon.setAttribute("class", "w-5 h-5 text-rose-500");
       } else if (["png", "jpg", "jpeg", "gif"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "image");
-        selectedFileIcon.className = "w-5 h-5 text-emerald-500";
+        selectedFileIcon.setAttribute("class", "w-5 h-5 text-emerald-500");
       } else if (["pkt", "pkz"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "file-check");
-        selectedFileIcon.className = "w-5 h-5 text-amber-400 animate-pulse";
+        selectedFileIcon.setAttribute("class", "w-5 h-5 text-amber-400 animate-pulse");
       } else {
         selectedFileIcon.setAttribute("data-lucide", "file-code");
-        selectedFileIcon.className = "w-5 h-5 text-cyan-500";
+        selectedFileIcon.setAttribute("class", "w-5 h-5 text-cyan-500");
       }
       renderIcons();
     }
