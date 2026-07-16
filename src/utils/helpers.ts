@@ -321,125 +321,123 @@ export async function uploadFileToServer(
   file: File, 
   onProgress?: (progress: number) => void
 ): Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }> {
+  // 1. Try DIRECT browser-to-Firebase Storage upload FIRST
+  // This is extremely fast, avoids server routing, and displays smooth real-time progress bars natively in the browser.
   try {
-    // 1. Try uploading to Server first
-    const result = await new Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append("file", file);
+    const { storage } = await import("../firebase/config");
+    const { ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
+    
+    const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+    const storageRef = ref(storage, `uploads/${safeName}`);
+    
+    return await new Promise((resolve, reject) => {
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      // Strict timeout of 35 seconds for client-to-cloud upload
+      const storageTimeout = setTimeout(() => {
+        uploadTask.cancel();
+        reject(new Error("Timeout mengunggah langsung ke Firebase Storage (35s)"));
+      }, 35000);
 
-      // Add a client-side timeout of 180 seconds to prevent hanging on slow network or scaled-down backend
-      const uploadTimeout = setTimeout(() => {
-        xhr.abort();
-        reject(new Error("Timeout mengunggah ke server (Batas waktu 180 detik terlampaui)"));
-      }, 180000);
-
-      xhr.open("POST", getApiUrl("/api/upload"));
-
-      if (onProgress) {
-        xhr.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            onProgress(percentComplete);
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          if (onProgress) {
+            const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            onProgress(progress);
           }
-        });
-      }
-
-      xhr.onload = () => {
-        clearTimeout(uploadTimeout);
-        if (xhr.status >= 200 && xhr.status < 300) {
+        },
+        (err) => {
+          clearTimeout(storageTimeout);
+          reject(err);
+        },
+        async () => {
+          clearTimeout(storageTimeout);
           try {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response);
-          } catch (e) {
-            reject(new Error("Respon server tidak valid"));
-          }
-        } else {
-          try {
-            const errRes = JSON.parse(xhr.responseText);
-            reject(new Error(errRes.error || `Gagal mengunggah berkas (${xhr.status})`));
-          } catch {
-            reject(new Error(`Gagal mengunggah berkas dengan kode status ${xhr.status}`));
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({
+              success: true,
+              fileUrl: downloadUrl,
+              fileName: file.name,
+              storage: "firebase_browser"
+            });
+          } catch (urlErr: any) {
+            reject(urlErr);
           }
         }
-      };
-
-      xhr.onerror = () => {
-        clearTimeout(uploadTimeout);
-        reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
-      };
-
-      xhr.send(formData);
+      );
     });
-    return result;
-  } catch (error) {
-    console.warn("Gagal mengunggah lewat server backend, mencoba fallback langsung ke Firebase Storage browser...", error);
+  } catch (firebaseError: any) {
+    console.warn("Direct Firebase Storage upload skipped or failed, falling back to server upload...", firebaseError);
     
-    // 2. Fallback to direct client-side Firebase Storage Upload
+    // 2. Fallback to Server Upload
     try {
-      // Dynamic import to avoid circular dependencies and keep startup footprint light
-      const { storage } = await import("../firebase/config");
-      const { ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
-      
-      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const storageRef = ref(storage, `fallback_uploads/${safeName}`);
-      
-      return await new Promise((resolve, reject) => {
-        const uploadTask = uploadBytesResumable(storageRef, file);
-        
-        // Storage task strict timeout (180s) to prevent sticking at 0% in retrying states if Storage is uninitialized/disabled
-        const storageTimeout = setTimeout(() => {
-          uploadTask.cancel();
-          reject(new Error("Timeout mengunggah langsung ke Firebase Storage (Batas waktu 180 detik terlampaui)"));
-        }, 180000);
+      const result = await new Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("file", file);
 
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            if (onProgress) {
-              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              onProgress(progress);
+        // Keep server-side upload timeout much shorter (35 seconds) to avoid hanging
+        const uploadTimeout = setTimeout(() => {
+          xhr.abort();
+          reject(new Error("Timeout mengunggah ke server (35s)"));
+        }, 35000);
+
+        xhr.open("POST", getApiUrl("/api/upload"));
+
+        if (onProgress) {
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = Math.round((event.loaded / event.total) * 100);
+              onProgress(percentComplete);
             }
-          },
-          (err) => {
-            clearTimeout(storageTimeout);
-            console.error("Direct browser upload failed too:", err);
-            reject(new Error("Gagal mengunggah berkas ke Firebase Storage langsung: " + err.message));
-          },
-          async () => {
-            clearTimeout(storageTimeout);
+          });
+        }
+
+        xhr.onload = () => {
+          clearTimeout(uploadTimeout);
+          if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve({
-                success: true,
-                fileUrl: downloadUrl,
-                fileName: file.name,
-                storage: "firebase_browser"
-              });
-            } catch (urlErr: any) {
-              reject(new Error("Gagal mendapatkan link unduhan berkas: " + urlErr.message));
+              const response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (e) {
+              reject(new Error("Respon server tidak valid"));
+            }
+          } else {
+            try {
+              const errRes = JSON.parse(xhr.responseText);
+              reject(new Error(errRes.error || `Gagal mengunggah berkas (${xhr.status})`));
+            } catch {
+              reject(new Error(`Gagal mengunggah berkas dengan kode status ${xhr.status}`));
             }
           }
-        );
+        };
+
+        xhr.onerror = () => {
+          clearTimeout(uploadTimeout);
+          reject(new Error("Koneksi jaringan gagal saat mengunggah berkas"));
+        };
+
+        xhr.send(formData);
       });
-    } catch (fallbackError: any) {
-      console.warn("Sistem upload cloud backend maupun fallback Firebase browser keduanya gagal/timeout. Menggunakan Ultimate Base64 Fallback...", fallbackError);
+      return result;
+    } catch (serverError: any) {
+      console.warn("Server upload failed too. Using ultimate local base64 fallback...", serverError);
       
-      // 3. Ultimate Fallback: Base64 data-URL inline storage for files (e.g. screenshots < 800KB)
-      // This is 100% robust, requires zero server/bucket setup, and works beautifully even in static-only hosting.
+      // 3. Ultimate Fallback: Base64 data-URL inline storage for files (only if size is < 1.5MB)
       try {
-        if (file.size > 1024 * 1024) {
-          throw new Error("Berkas melebihi batas ukuran 1MB untuk mode luring.");
+        if (file.size > 1.5 * 1024 * 1024) {
+          throw new Error("Ukuran berkas melebihi 1.5MB untuk penyimpanan luring.");
         }
         
         if (onProgress) {
-          onProgress(30);
+          onProgress(50);
         }
         
         const base64Url = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error("Gagal memproses berkas lokal"));
+          reader.onerror = () => reject(new Error("Gagal membaca berkas lokal"));
           reader.readAsDataURL(file);
         });
         
@@ -447,7 +445,6 @@ export async function uploadFileToServer(
           onProgress(100);
         }
         
-        console.log("Berhasil memproses berkas sebagai Base64 URI fallback.");
         return {
           success: true,
           fileUrl: base64Url,
@@ -455,7 +452,7 @@ export async function uploadFileToServer(
           storage: "base64"
         };
       } catch (base64Err: any) {
-        throw new Error("Gagal memproses file lokal: " + base64Err.message);
+        throw new Error("Semua metode unggah gagal: " + base64Err.message);
       }
     }
   }

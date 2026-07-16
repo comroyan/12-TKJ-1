@@ -250,13 +250,13 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
                   <label class="block text-xs text-slate-400 font-semibold mb-1.5">Upload File / Lampiran Tugas</label>
                   
                   <div id="dropzone" class="border-2 border-dashed border-slate-800 hover:border-cyan-500/50 bg-slate-950/50 hover:bg-cyan-950/5 rounded-2xl p-6 text-center cursor-pointer transition-all relative group">
-                    <input type="file" id="fileInput" class="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg">
+                    <input type="file" id="fileInput" class="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.pkt,.pkz">
                     <div id="dropzoneContent" class="space-y-2">
                       <div class="inline-flex p-3 bg-cyan-500/10 text-cyan-400 rounded-xl group-hover:scale-110 transition-transform">
                         <i data-lucide="cloud-lightning" class="w-6 h-6"></i>
                       </div>
                       <p class="text-xs font-semibold text-slate-300">Tarik berkas ke sini atau <span class="text-cyan-400 underline">pilih dari folder</span></p>
-                      <p class="text-[10px] text-slate-500 font-mono">ZIP, PDF, DOCX, PNG (Maks. 50MB)</p>
+                      <p class="text-[10px] text-slate-500 font-mono">PKT, PKZ, ZIP, PDF, DOCX, PNG (Maks. 50MB)</p>
                     </div>
                     
                     <!-- Selected File State -->
@@ -567,7 +567,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       } else if (["png", "jpg", "jpeg", "gif"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "image");
         selectedFileIcon.className = "w-5 h-5 text-emerald-500";
-      } else if (ext === "pkt") {
+      } else if (["pkt", "pkz"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "file-check");
         selectedFileIcon.className = "w-5 h-5 text-amber-400 animate-pulse";
       } else {

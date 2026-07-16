@@ -188,7 +188,7 @@ export function renderDiskusi(container: HTMLElement, userSession: any) {
       <form id="sendMessageForm" class="flex items-center gap-3 relative">
         <label for="chatFileInput" class="p-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 hover:text-white rounded-xl cursor-pointer transition-all shrink-0" title="Unggah File / Gambar">
           <i data-lucide="paperclip" class="w-4 h-4"></i>
-          <input type="file" id="chatFileInput" class="hidden" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar">
+          <input type="file" id="chatFileInput" class="hidden" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.pkt,.pkz">
         </label>
         
         <div class="relative flex-1">

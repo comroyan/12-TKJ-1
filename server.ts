@@ -19,6 +19,9 @@ if (fs.existsSync(configPath)) {
     const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     firebaseApp = initializeApp(firebaseConfig);
     firebaseStorage = getStorage(firebaseApp);
+    // Limit Firebase Storage SDK retries to prevent event-loop hangs (default is 10 minutes!)
+    firebaseStorage.maxUploadRetryTime = 3000; // 3 seconds
+    firebaseStorage.maxOperationRetryTime = 3000; // 3 seconds
     console.log("Firebase Storage initialized successfully on the server side.");
   } catch (err) {
     console.error("Gagal menginisialisasi Firebase di server:", err);
