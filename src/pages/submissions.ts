@@ -64,14 +64,15 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
           `;
         } else {
           const ext = fileName.split(".").pop()?.toUpperCase() || "Berkas";
+          const isPkt = ext === "PKT";
           previewHtml = `
             <div class="flex flex-col items-center gap-3">
               <div class="w-full h-[180px] rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
-                <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-full mb-2">
-                  <i data-lucide="file-archive" class="w-10 h-10"></i>
+                <div class="p-3 ${isPkt ? 'bg-amber-500/10 text-amber-400' : 'bg-cyan-500/10 text-cyan-400'} rounded-full mb-2">
+                  <i data-lucide="${isPkt ? 'file-check' : 'file-archive'}" class="w-10 h-10"></i>
                 </div>
                 <p class="text-xs font-bold text-slate-200 truncate w-full px-4">${fileName}</p>
-                <p class="text-[10px] text-slate-500 mt-1">Berkas ${ext} (Gunakan tombol unduh di bawah)</p>
+                <p class="text-[10px] text-slate-500 mt-1">${isPkt ? 'Berkas Simulasi Cisco Packet Tracer (.PKT)' : `Berkas ${ext}`} (Gunakan tombol unduh di bawah)</p>
               </div>
             </div>
           `;
@@ -566,6 +567,9 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       } else if (["png", "jpg", "jpeg", "gif"].includes(ext || "")) {
         selectedFileIcon.setAttribute("data-lucide", "image");
         selectedFileIcon.className = "w-5 h-5 text-emerald-500";
+      } else if (ext === "pkt") {
+        selectedFileIcon.setAttribute("data-lucide", "file-check");
+        selectedFileIcon.className = "w-5 h-5 text-amber-400 animate-pulse";
       } else {
         selectedFileIcon.setAttribute("data-lucide", "file-code");
         selectedFileIcon.className = "w-5 h-5 text-cyan-500";
