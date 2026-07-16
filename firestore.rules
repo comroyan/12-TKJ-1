@@ -239,5 +239,31 @@ service cloud.firestore {
         isPrivilegedUser()
       );
     }
+
+    // Saluran Collection (WhatsApp-like Broadcast Channels)
+    match /saluran/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        isWakil() ||
+        isSekretaris() ||
+        isBendahara() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().get('jabatan', '').toLower().matches('.*ketua.*') ||
+          getUserData().get('jabatan', '').toLower().matches('.*sekretaris.*') ||
+          getUserData().get('jabatan', '').toLower().matches('.*bendahara.*') ||
+          getUserData().get('jabatan', '').toLower().matches('.*wakil.*')
+        ))
+      );
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (resource.data.authorId == request.auth.uid) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']))
+      );
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        resource.data.authorId == request.auth.uid
+      );
+    }
   }
 }

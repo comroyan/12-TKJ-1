@@ -33,6 +33,7 @@ import { renderMiniGames } from "./pages/miniGames";
 import { renderLinkBelajar } from "./pages/linkBelajar";
 import { renderDiskusi, cleanupDiskusiListener } from "./pages/diskusi";
 import { renderSubmissions } from "./pages/submissions";
+import { renderSaluran } from "./pages/saluran";
 
 // App Core State
 let activeUserSession: UserSession | null = null;
@@ -534,6 +535,9 @@ async function renderMainLayout() {
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-cyan-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="diskusi">
               <i data-lucide="message-circle" class="w-4 h-4 text-cyan-400 animate-pulse"></i> Diskusi Kelas
             </button>
+            <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-emerald-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="saluran">
+              <i data-lucide="radio" class="w-4 h-4 text-emerald-400"></i> Saluran Informasi <span class="ml-auto text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider font-mono animate-pulse">Siaran</span>
+            </button>
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="learning-center">
               <i data-lucide="book-open" class="w-4 h-4 text-cyan-400"></i> Learning Center
             </button>
@@ -661,6 +665,9 @@ async function renderMainLayout() {
         break;
       case "diskusi":
         renderDiskusi(pageContent, activeUserSession);
+        break;
+      case "saluran":
+        renderSaluran(pageContent, activeUserSession);
         break;
       case "learning-center":
         renderLearningCenter(pageContent, activeUserSession);

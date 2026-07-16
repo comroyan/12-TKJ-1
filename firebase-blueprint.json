@@ -374,6 +374,24 @@
         "feedback": { "type": "string" }
       },
       "required": ["taskId", "taskTitle", "subject", "userId", "userName", "fileUrl", "fileName", "submittedAt"]
+    },
+    "ChannelPost": {
+      "title": "ChannelPost",
+      "description": "WhatsApp-like channel information broadcasted by authorized class administrators/officers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorJabatan": { "type": "string" },
+        "authorFoto": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "likes": { "type": "array" },
+        "views": { "type": "integer" }
+      },
+      "required": ["title", "content", "authorId", "authorName", "date"]
     }
   },
   "firestore": {
@@ -480,6 +498,10 @@
     "submissions": {
       "schema": "Submission",
       "description": "Student homework and assignment submissions"
+    },
+    "saluran": {
+      "schema": "ChannelPost",
+      "description": "WA-like channels for information/announcements by class leaders and officers"
     }
   }
 }

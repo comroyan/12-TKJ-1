@@ -986,4 +986,53 @@ export async function saveCountdownSettings(data: any) {
   }
 }
 
+// --- SALURAN (CHANNEL POSTS) ---
+export async function getSaluranPosts() {
+  const path = "saluran";
+  return fetchWithCache("saluran", async () => {
+    const q = query(collection(db, path), orderBy("date", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  });
+}
+
+export async function addSaluranPost(data: any) {
+  const path = "saluran";
+  try {
+    const docRef = await addDoc(collection(db, path), {
+      ...data,
+      likes: [],
+      views: 0,
+      date: serverTimestamp()
+    });
+    invalidateCache("saluran");
+    await writeAuditLog("Create Saluran Post", `Membuat postingan baru di Saluran: ${data.title}`);
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function updateSaluranPost(id: string, data: any) {
+  const path = `saluran/${id}`;
+  try {
+    await updateDoc(doc(db, "saluran", id), data);
+    invalidateCache("saluran");
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteSaluranPost(id: string) {
+  const path = `saluran/${id}`;
+  try {
+    await deleteDoc(doc(db, "saluran", id));
+    invalidateCache("saluran");
+    await writeAuditLog("Delete Saluran Post", `Menghapus postingan Saluran ID: ${id}`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+
 
