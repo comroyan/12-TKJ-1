@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import multer from "multer";
 import fs from "fs";
+import os from "os";
 import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -47,10 +48,18 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Setup local uploads storage directory
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  // Setup local uploads storage directory with dynamic writable fallback (crucial for read-only environments like Vercel)
+  let uploadsDir = path.join(process.cwd(), "public", "uploads");
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn("Gagal membuat direktori uploads di public/uploads (read-only filesystem?), beralih ke /tmp/uploads...", err);
+    uploadsDir = path.join(os.tmpdir(), "uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
   }
 
   // Configure Multer storage
@@ -92,31 +101,41 @@ async function startServer() {
       const serverOrigin = `${protocol}://${host}`;
       const fileUrlLocal = `${serverOrigin}/uploads/${req.file.filename}`;
 
+      let finalFileUrl = fileUrlLocal;
+      let storageUsed = "local";
+
       if (firebaseStorage) {
-        // Upload to Firebase Storage in the background (asynchronous) to not block the response
-        console.log(`Mengunggah ${originalName} ke Firebase Storage di latar belakang...`);
-        const fileBuffer = fs.readFileSync(localFilePath);
-        
-        // Buat nama berkas unik yang aman
-        const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-        const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
-        
-        uploadBytes(storageRef, fileBuffer, { contentType: mimeType })
-          .then(async () => {
-            const downloadUrl = await getDownloadURL(storageRef);
-            console.log("Berhasil mengunggah ke Firebase Storage di latar belakang:", downloadUrl);
-          })
-          .catch((storageErr: any) => {
-            console.warn("Gagal mengunggah ke Firebase Storage di latar belakang:", storageErr.message);
-          });
+        try {
+          console.log(`Mengunggah ${originalName} ke Firebase Storage secara sinkron...`);
+          const fileBuffer = fs.readFileSync(localFilePath);
+          
+          // Buat nama berkas unik yang aman
+          const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+          const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
+          
+          await uploadBytes(storageRef, fileBuffer, { contentType: mimeType });
+          const downloadUrl = await getDownloadURL(storageRef);
+          console.log("Berhasil mengunggah ke Firebase Storage secara sinkron:", downloadUrl);
+          
+          finalFileUrl = downloadUrl;
+          storageUsed = "firebase_server";
+
+          // Delete local file to save storage space
+          try {
+            fs.unlinkSync(localFilePath);
+          } catch (unlinkErr) {
+            console.warn("Gagal menghapus berkas lokal sementara:", unlinkErr);
+          }
+        } catch (storageErr: any) {
+          console.warn("Gagal mengunggah ke Firebase Storage, beralih ke URL lokal:", storageErr.message);
+        }
       }
 
-      // Selalu kembalikan URL penyimpanan lokal secara instan (kecepatan sub-detik!)
       return res.json({
         success: true,
-        fileUrl: fileUrlLocal,
+        fileUrl: finalFileUrl,
         fileName: originalName,
-        storage: "local"
+        storage: storageUsed
       });
     } catch (error: any) {
       console.error("Upload Error:", error);
