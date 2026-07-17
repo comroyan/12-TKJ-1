@@ -41,6 +41,48 @@ let activeUserSession: UserSession | null = null;
 let currentActivePage = "dashboard";
 let globalUnsubscribeNotifications: (() => void) | null = null;
 
+// Theme Engine
+export function applyTheme() {
+  const currentTheme = localStorage.getItem("classhub_theme") || "dark";
+  const htmlEl = document.documentElement;
+  
+  if (currentTheme === "light") {
+    htmlEl.classList.add("light-theme");
+  } else {
+    htmlEl.classList.remove("light-theme");
+  }
+  
+  const themeToggleButtons = document.querySelectorAll("#themeToggleBtn, #mobileThemeToggleBtn");
+  themeToggleButtons.forEach((btn: any) => {
+    const lightIcon = btn.querySelector(".light-icon");
+    const darkIcon = btn.querySelector(".dark-icon");
+    if (lightIcon && darkIcon) {
+      if (currentTheme === "light") {
+        lightIcon.classList.add("hidden");
+        lightIcon.classList.remove("block");
+        darkIcon.classList.add("block");
+        darkIcon.classList.remove("hidden");
+      } else {
+        lightIcon.classList.add("block");
+        lightIcon.classList.remove("hidden");
+        darkIcon.classList.add("hidden");
+        darkIcon.classList.remove("block");
+      }
+    }
+  });
+}
+
+export function toggleTheme() {
+  const currentTheme = localStorage.getItem("classhub_theme") || "dark";
+  const newTheme = currentTheme === "dark" ? "light" : "dark";
+  localStorage.setItem("classhub_theme", newTheme);
+  applyTheme();
+}
+
+// Initial theme apply
+applyTheme();
+
+
 // PWA Service Worker Registration
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -502,9 +544,15 @@ async function renderMainLayout() {
           <img src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=48&h=48&fit=crop" id="headerClassLogo" class="w-8 h-8 rounded-xl object-cover border border-slate-800">
           <span class="text-sm font-bold font-display tracking-tight" id="headerClassName">XII TKJ 1</span>
         </div>
-        <button id="mobileBurgerBtn" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-900 border border-slate-850">
-          <i data-lucide="menu" class="w-5 h-5"></i>
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="mobileThemeToggleBtn" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-900 border border-slate-850" title="Ubah Tema">
+            <i data-lucide="sun" class="w-5 h-5 light-icon block"></i>
+            <i data-lucide="moon" class="w-5 h-5 dark-icon hidden"></i>
+          </button>
+          <button id="mobileBurgerBtn" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-900 border border-slate-850">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Sidebar (Responsive Overlay for Mobile) -->
@@ -595,9 +643,15 @@ async function renderMainLayout() {
               <span id="sidebarUserJabatan" class="text-[9px] text-slate-500 block mt-0.5 truncate uppercase font-mono">${activeUserSession.jabatan}</span>
             </div>
           </div>
-          <button id="logoutBtn" class="p-2 bg-slate-900 border border-slate-850 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition-colors" title="Keluar">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
-          </button>
+          <div class="flex items-center gap-1.5">
+            <button id="themeToggleBtn" class="p-2 bg-slate-900 border border-slate-850 hover:bg-sky-500/10 text-slate-400 hover:text-sky-400 rounded-xl transition-colors" title="Ubah Tema">
+              <i data-lucide="sun" class="w-4 h-4 light-icon block"></i>
+              <i data-lucide="moon" class="w-4 h-4 dark-icon hidden"></i>
+            </button>
+            <button id="logoutBtn" class="p-2 bg-slate-900 border border-slate-850 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition-colors" title="Keluar">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -609,6 +663,7 @@ async function renderMainLayout() {
   `;
 
   renderIcons();
+  applyTheme();
 
   // Setup real-time notifications listener
   if (globalUnsubscribeNotifications) {
@@ -747,6 +802,14 @@ async function renderMainLayout() {
         sidebarPanel.classList.add("hidden");
       }
     }
+  });
+
+  // Theme Toggle listeners
+  document.getElementById("themeToggleBtn")?.addEventListener("click", () => {
+    toggleTheme();
+  });
+  document.getElementById("mobileThemeToggleBtn")?.addEventListener("click", () => {
+    toggleTheme();
   });
 
   // Logout listener
