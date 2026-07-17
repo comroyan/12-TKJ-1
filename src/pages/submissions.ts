@@ -507,6 +507,10 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
     const progressPercentage = document.getElementById("progressPercentage") as HTMLSpanElement;
 
     let selectedFile: File | null = null;
+    let preUploadedUrl: string | null = null;
+    let preUploadedName: string | null = null;
+    let isPreUploading = false;
+    let preUploadError: string | null = null;
 
     // Trigger file selection via click
     dropzone.addEventListener("click", (e) => {
@@ -544,7 +548,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
       }
     });
 
-    function handleFileSelect(file: File) {
+    async function handleFileSelect(file: File) {
       if (file.size > 50 * 1024 * 1024) {
         toast.error("Ukuran file melebihi batas maksimal 50MB!");
         return;
@@ -575,15 +579,67 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         selectedFileIcon.setAttribute("class", "w-5 h-5 text-cyan-500");
       }
       renderIcons();
+
+      // Trigger automatic background upload immediately!
+      preUploadedUrl = null;
+      preUploadedName = null;
+      preUploadError = null;
+      isPreUploading = true;
+
+      uploadProgressContainer.classList.remove("hidden");
+      progressBar.style.width = "0%";
+      progressPercentage.textContent = "0%";
+      const statusText = uploadProgressContainer.querySelector("p");
+      if (statusText) {
+        statusText.textContent = "Mengunggah berkas ke server ClassHub...";
+        statusText.className = "text-[9px] text-slate-400 font-mono text-center animate-pulse";
+      }
+
+      try {
+        console.log(`[AutoUpload] Memulai pengunggahan otomatis di latar belakang untuk: ${file.name}`);
+        const uploadResult = await uploadFileToServer(file, (progress) => {
+          progressBar.style.width = progress + "%";
+          progressPercentage.textContent = progress + "%";
+        });
+
+        if (uploadResult && uploadResult.fileUrl) {
+          preUploadedUrl = uploadResult.fileUrl;
+          preUploadedName = uploadResult.fileName;
+          isPreUploading = false;
+          progressBar.style.width = "100%";
+          progressPercentage.textContent = "100%";
+          if (statusText) {
+            statusText.textContent = "Berkas berhasil diunggah & siap dikirim!";
+            statusText.className = "text-[9px] text-emerald-400 font-mono text-center font-bold";
+          }
+          toast.success("Berkas siap dikirim!");
+        } else {
+          throw new Error("Gagal mendapatkan URL berkas dari server");
+        }
+      } catch (err: any) {
+        console.error("[AutoUpload] Gagal mengunggah berkas:", err);
+        preUploadError = err.message || "Gagal mengunggah berkas";
+        isPreUploading = false;
+        if (statusText) {
+          statusText.textContent = `Gagal mengunggah: ${preUploadError}`;
+          statusText.className = "text-[9px] text-rose-400 font-mono text-center font-bold";
+        }
+        toast.error("Gagal mengunggah berkas di latar belakang.");
+      }
     }
 
     // Remove file selection
     removeFileBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       selectedFile = null;
+      preUploadedUrl = null;
+      preUploadedName = null;
+      isPreUploading = false;
+      preUploadError = null;
       fileInput.value = "";
       selectedFileState.classList.add("hidden");
       dropzoneContent.classList.remove("hidden");
+      uploadProgressContainer.classList.add("hidden");
     });
 
     // Submit assignment
@@ -635,35 +691,55 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         });
       }
 
-      // Start uploading animation
+      // Lock submit button
       submitSubBtn.disabled = true;
-      uploadProgressContainer.classList.remove("hidden");
 
-      progressBar.style.width = "0%";
-      progressPercentage.textContent = "0%";
+      // Handle active/pending background pre-uploads smoothly
+      if (isPreUploading) {
+        toast.info("Menyelesaikan pengunggahan berkas... Harap tunggu sebentar.");
+        // Poll every 100ms until upload is finished or failed
+        while (isPreUploading) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // If background upload failed, try triggering it now synchronously
+      if (!preUploadedUrl) {
+        try {
+          uploadProgressContainer.classList.remove("hidden");
+          progressBar.style.width = "0%";
+          progressPercentage.textContent = "0%";
+          const statusText = uploadProgressContainer.querySelector("p");
+          if (statusText) {
+            statusText.textContent = "Mencoba mengunggah ulang berkas...";
+            statusText.className = "text-[9px] text-slate-400 font-mono text-center animate-pulse";
+          }
+
+          console.log("Mencoba unggah ulang berkas secara sinkron...");
+          const uploadResult = await uploadFileToServer(selectedFile, (progress) => {
+            progressBar.style.width = progress + "%";
+            progressPercentage.textContent = progress + "%";
+          });
+
+          preUploadedUrl = uploadResult.fileUrl;
+          preUploadedName = uploadResult.fileName;
+          progressBar.style.width = "100%";
+          progressPercentage.textContent = "100%";
+        } catch (uploadErr: any) {
+          Swal.fire("Gagal Mengirim", `Pengunggahan berkas gagal: ${uploadErr.message}`, "error");
+          submitSubBtn.disabled = false;
+          return;
+        }
+      }
+
+      // Double check URL
+      if (!preUploadedUrl) {
+        Swal.fire("Gagal Mengirim", "Tautan berkas kosong atau tidak ditemukan.", "error");
+        submitSubBtn.disabled = false;
+        return;
+      }
 
       try {
-        if (!selectedFile) {
-          throw new Error("Berkas lampiran tidak ditemukan.");
-        }
-
-        console.log("Mencoba unggah berkas melalui server ke Firebase Storage...");
-        
-        const uploadResult = await uploadFileToServer(selectedFile, (progress) => {
-          progressBar.style.width = progress + "%";
-          progressPercentage.textContent = progress + "%";
-        });
-
-        const fileUrl = uploadResult.fileUrl;
-
-        // Ensure we have a valid URL
-        if (!fileUrl) {
-          throw new Error("Tautan berkas kosong atau tidak valid.");
-        }
-
-        progressBar.style.width = "100%";
-        progressPercentage.textContent = "100%";
-
         const submissionPayload = {
           taskId,
           taskTitle,
@@ -672,7 +748,7 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
           userName: userSession.name,
           absen: userSession.absen || 0,
           fileName: selectedFile.name,
-          fileUrl: fileUrl, // URL link to file
+          fileUrl: preUploadedUrl, // Preloaded URL link to file
           status: "Menunggu Pemeriksaan",
           feedback: "",
           taskType,
@@ -682,11 +758,16 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
         await addSubmission(submissionPayload);
         toast.success("Tugas Anda berhasil diunggah!");
         
-        // Reset selected file in form
+        // Reset selected file in form & clear pre-upload state
         selectedFile = null;
+        preUploadedUrl = null;
+        preUploadedName = null;
+        isPreUploading = false;
+        preUploadError = null;
         fileInput.value = "";
         selectedFileState.classList.add("hidden");
         dropzoneContent.classList.remove("hidden");
+        uploadProgressContainer.classList.add("hidden");
         
         loadAndRender();
       } catch (err: any) {
