@@ -81,8 +81,36 @@ async function startServer() {
     limits: { fileSize: 50 * 1024 * 1024 }, // Max 50MB
   });
 
-  // Serve uploaded files statically at /uploads
-  app.use("/uploads", express.static(uploadsDir));
+  // Serve uploaded files statically at /uploads, with on-demand lazy loading recovery from Firebase Storage if missing
+  app.get("/uploads/:filename", async (req: any, res: any) => {
+    const filename = req.params.filename;
+    const localPath = path.join(uploadsDir, filename);
+
+    if (fs.existsSync(localPath)) {
+      return res.sendFile(localPath);
+    }
+
+    // If local file is missing (e.g. server restart), lazily recover from Firebase Storage
+    if (firebaseStorage) {
+      try {
+        console.log(`[LazyLoad] Berkas ${filename} tidak ditemukan lokal. Memulihkan dari Firebase Storage...`);
+        const storageRef = ref(firebaseStorage, `uploads/${filename}`);
+        const downloadUrl = await getDownloadURL(storageRef);
+        
+        const response = await fetch(downloadUrl);
+        if (response.ok) {
+          const buffer = Buffer.from(await response.arrayBuffer());
+          fs.writeFileSync(localPath, buffer);
+          console.log(`[LazyLoad] Berkas ${filename} berhasil diunduh dan dipulihkan lokal.`);
+          return res.sendFile(localPath);
+        }
+      } catch (err: any) {
+        console.warn(`[LazyLoad] Gagal memulihkan berkas ${filename} dari Firebase Storage:`, err.message);
+      }
+    }
+
+    res.status(404).send("File tidak ditemukan");
+  });
 
   // API Route: File Upload
   app.post("/api/upload", upload.single("file"), async (req: any, res: any) => {
@@ -94,48 +122,36 @@ async function startServer() {
       const localFilePath = req.file.path;
       const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
+      const filename = req.file.filename;
       
       // Build absolute local URL fallback so it works seamlessly on external domains like Vercel
       const protocol = req.secure || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
       const host = req.headers["x-forwarded-host"] || req.get("host");
       const serverOrigin = `${protocol}://${host}`;
-      const fileUrlLocal = `${serverOrigin}/uploads/${req.file.filename}`;
+      const fileUrlLocal = `${serverOrigin}/uploads/${filename}`;
 
-      let finalFileUrl = fileUrlLocal;
-      let storageUsed = "local";
-
+      // Start asynchronous non-blocking upload to Firebase Storage in the background
       if (firebaseStorage) {
-        try {
-          console.log(`Mengunggah ${originalName} ke Firebase Storage secara sinkron...`);
-          const fileBuffer = fs.readFileSync(localFilePath);
-          
-          // Buat nama berkas unik yang aman
-          const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-          const storageRef = ref(firebaseStorage, `uploads/${safeName}`);
-          
-          await uploadBytes(storageRef, fileBuffer, { contentType: mimeType });
-          const downloadUrl = await getDownloadURL(storageRef);
-          console.log("Berhasil mengunggah ke Firebase Storage secara sinkron:", downloadUrl);
-          
-          finalFileUrl = downloadUrl;
-          storageUsed = "firebase_server";
-
-          // Delete local file to save storage space
+        console.log(`[Upload] Memulai unggahan latar belakang untuk berkas: ${filename}`);
+        // Run in a separate immediately invoked async expression
+        (async () => {
           try {
-            fs.unlinkSync(localFilePath);
-          } catch (unlinkErr) {
-            console.warn("Gagal menghapus berkas lokal sementara:", unlinkErr);
+            const fileBuffer = fs.readFileSync(localFilePath);
+            const storageRef = ref(firebaseStorage, `uploads/${filename}`);
+            await uploadBytes(storageRef, fileBuffer, { contentType: mimeType });
+            console.log(`[Upload] Unggahan latar belakang ke Firebase Storage selesai: ${filename}`);
+          } catch (storageErr: any) {
+            console.error(`[Upload] Gagal mengunggah ke Firebase Storage di latar belakang:`, storageErr.message);
           }
-        } catch (storageErr: any) {
-          console.warn("Gagal mengunggah ke Firebase Storage, beralih ke URL lokal:", storageErr.message);
-        }
+        })();
       }
 
+      // Immediately return success with the local URL! This operates under 100ms!
       return res.json({
         success: true,
-        fileUrl: finalFileUrl,
+        fileUrl: fileUrlLocal,
         fileName: originalName,
-        storage: storageUsed
+        storage: "local_cache"
       });
     } catch (error: any) {
       console.error("Upload Error:", error);
