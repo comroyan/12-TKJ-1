@@ -306,6 +306,20 @@ export function getApiUrl(path: string): string {
     return path;
   }
   const currentOrigin = window.location.origin;
+  
+  // Robust check for previews, sandbox, local and container environments to prevent routing to dead external URLs
+  if (
+    currentOrigin.includes("googleusercontent.com") ||
+    currentOrigin.includes("aistudio.google") ||
+    currentOrigin.includes("google.com") ||
+    currentOrigin.includes("localhost") ||
+    currentOrigin.includes("127.0.0.1") ||
+    currentOrigin.includes("run.app")
+  ) {
+    return path;
+  }
+  
+  // External deployments (e.g. Vercel or GitHub Pages)
   if (
     currentOrigin.includes("vercel.app") ||
     currentOrigin.includes("github.io") ||
@@ -316,22 +330,93 @@ export function getApiUrl(path: string): string {
   return path;
 }
 
+// Client-side image compression utility to prevent exceeding Firestore sizes & speed up uploads
+export async function compressImage(file: File, maxW = 1200, maxH = 1200, quality = 0.75): Promise<File> {
+  if (!file.type.startsWith("image/")) {
+    return file;
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement("img");
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxW || height > maxH) {
+          if (width > height) {
+            height = Math.round((height * maxW) / width);
+            width = maxW;
+          } else {
+            width = Math.round((width * maxH) / height);
+            height = maxH;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const compressedFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            // Only return compressed if it's actually smaller
+            resolve(compressedFile.size < file.size ? compressedFile : file);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
 // Reusable server-side upload helper which avoids CORS, with automatic browser-side Firebase Storage fallback
 export async function uploadFileToServer(
   file: File, 
   onProgress?: (progress: number) => void
 ): Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }> {
+  // Always compress images client-side before any upload attempt to ensure small sizes and Firestore compatibility
+  let fileToUpload = file;
+  if (file.type.startsWith("image/")) {
+    try {
+      fileToUpload = await compressImage(file);
+      console.log(`Image compressed from ${(file.size / 1024).toFixed(1)}KB to ${(fileToUpload.size / 1024).toFixed(1)}KB`);
+    } catch (err) {
+      console.warn("Gagal mengompresi gambar, menggunakan file asli:", err);
+    }
+  }
+
   // 1. Try DIRECT browser-to-Firebase Storage upload FIRST
   // This is extremely fast, avoids server latency, has native client-side progress updates, and stores files permanently in the cloud.
   try {
     const { storage } = await import("../firebase/config");
     const { ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
     
-    const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+    const safeName = `${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
     const storageRef = ref(storage, `uploads/${safeName}`);
     
     return await new Promise((resolve, reject) => {
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
       
       // Strict timeout of 20 seconds for direct client-to-cloud upload (plenty for standard files)
       const storageTimeout = setTimeout(() => {
@@ -358,7 +443,7 @@ export async function uploadFileToServer(
             resolve({
               success: true,
               fileUrl: downloadUrl,
-              fileName: file.name,
+              fileName: fileToUpload.name,
               storage: "firebase_browser"
             });
           } catch (urlErr: any) {
@@ -375,7 +460,7 @@ export async function uploadFileToServer(
       const result = await new Promise<{ success: boolean; fileUrl: string; fileName: string; storage: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", fileToUpload);
 
         // Keep server-side fallback timeout short (15 seconds)
         const uploadTimeout = setTimeout(() => {
@@ -424,10 +509,10 @@ export async function uploadFileToServer(
     } catch (serverError: any) {
       console.warn("Server upload failed too. Using ultimate local base64 fallback...", serverError);
       
-      // 3. Ultimate Fallback: Base64 data-URL inline storage for files (only if size is < 1.5MB)
+      // 3. Ultimate Fallback: Base64 data-URL inline storage for files (only if size is < 1.0MB to safeguard Firestore limit)
       try {
-        if (file.size > 1.5 * 1024 * 1024) {
-          throw new Error("Ukuran berkas melebihi 1.5MB untuk penyimpanan luring.");
+        if (fileToUpload.size > 0.7 * 1024 * 1024) {
+          throw new Error("Ukuran berkas melebihi batas simpan luring (700KB).");
         }
         
         if (onProgress) {
@@ -438,7 +523,7 @@ export async function uploadFileToServer(
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = () => reject(new Error("Gagal membaca berkas lokal"));
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(fileToUpload);
         });
         
         if (onProgress) {
@@ -448,7 +533,7 @@ export async function uploadFileToServer(
         return {
           success: true,
           fileUrl: base64Url,
-          fileName: file.name,
+          fileName: fileToUpload.name,
           storage: "base64"
         };
       } catch (base64Err: any) {

@@ -36,7 +36,10 @@ export async function isSetupCompleted(): Promise<boolean> {
     currentOrigin.includes("localhost") || 
     currentOrigin.includes("127.0.0.1") || 
     currentOrigin.includes("ais-dev") ||
-    currentOrigin.includes("run.app");
+    currentOrigin.includes("run.app") ||
+    currentOrigin.includes("googleusercontent.com") ||
+    currentOrigin.includes("aistudio.google") ||
+    currentOrigin.includes("google.com");
 
   if (!isLocalOrSandbox) {
     // In production setups on external domains like Vercel, setup is always completed.
