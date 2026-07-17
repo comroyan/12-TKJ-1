@@ -1034,5 +1034,65 @@ export async function deleteSaluranPost(id: string) {
   }
 }
 
+// --- PRACTICE QUIZZES & SUBMISSIONS ---
+export async function getPracticeQuizzes() {
+  const path = "practiceQuizzes";
+  return fetchWithCache("practiceQuizzes", async () => {
+    const q = query(collection(db, path), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  });
+}
+
+export async function addPracticeQuiz(data: any) {
+  const path = "practiceQuizzes";
+  try {
+    const docRef = await addDoc(collection(db, path), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+    invalidateCache("practiceQuizzes");
+    await writeAuditLog("Create Practice Quiz", `Membuat latihan soal baru: ${data.title}`);
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deletePracticeQuiz(id: string) {
+  const path = `practiceQuizzes/${id}`;
+  try {
+    await deleteDoc(doc(db, "practiceQuizzes", id));
+    invalidateCache("practiceQuizzes");
+    await writeAuditLog("Delete Practice Quiz", `Menghapus latihan soal ID: ${id}`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function getPracticeSubmissions() {
+  const path = "practiceSubmissions";
+  return fetchWithCache("practiceSubmissions", async () => {
+    const q = query(collection(db, path), orderBy("submittedAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  });
+}
+
+export async function addPracticeSubmission(data: any) {
+  const path = "practiceSubmissions";
+  try {
+    const docRef = await addDoc(collection(db, path), {
+      ...data,
+      submittedAt: serverTimestamp()
+    });
+    invalidateCache("practiceSubmissions");
+    await writeAuditLog("Submit Practice Quiz", `Siswa ${data.userName} menyelesaikan latihan soal ID: ${data.quizId}`);
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 
 

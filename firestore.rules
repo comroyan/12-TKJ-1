@@ -265,5 +265,24 @@ service cloud.firestore {
         resource.data.authorId == request.auth.uid
       );
     }
+
+    // PracticeQuizzes Collection
+    match /practiceQuizzes/{quizId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isPrivilegedUser();
+    }
+
+    // PracticeSubmissions Collection
+    match /practiceSubmissions/{submissionId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isPrivilegedUser()
+      );
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isPrivilegedUser()
+      );
+    }
   }
 }

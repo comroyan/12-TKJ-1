@@ -392,6 +392,38 @@
         "views": { "type": "integer" }
       },
       "required": ["title", "content", "authorId", "authorName", "date"]
+    },
+    "PracticeQuiz": {
+      "title": "PracticeQuiz",
+      "description": "Quizzes created by Ketua Kelas for student exam/theory practice",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "description": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "questions": { "type": "array" }
+      },
+      "required": ["title", "subject", "questions", "createdBy"]
+    },
+    "PracticeSubmission": {
+      "title": "PracticeSubmission",
+      "description": "Student exam practice solutions and scores",
+      "type": "object",
+      "properties": {
+        "quizId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "absen": { "type": "integer" },
+        "answers": { "type": "object" },
+        "score": { "type": "number" },
+        "totalCorrect": { "type": "integer" },
+        "totalMcQuestions": { "type": "integer" },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["quizId", "userId", "userName", "submittedAt"]
     }
   },
   "firestore": {
@@ -502,6 +534,14 @@
     "saluran": {
       "schema": "ChannelPost",
       "description": "WA-like channels for information/announcements by class leaders and officers"
+    },
+    "practiceQuizzes": {
+      "schema": "PracticeQuiz",
+      "description": "Exam/Theory practice quizzes"
+    },
+    "practiceSubmissions": {
+      "schema": "PracticeSubmission",
+      "description": "Exam/Theory practice submissions"
     }
   }
 }

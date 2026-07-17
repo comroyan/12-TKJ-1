@@ -28,6 +28,7 @@ import { renderContacts } from "./pages/contacts";
 import { renderProfile } from "./pages/profile";
 import { renderLogs } from "./pages/logs";
 import { renderLearningCenter } from "./pages/learningCenter";
+import { renderLatihan } from "./pages/latihan";
 import { renderTKJHub } from "./pages/tkjHub";
 import { renderMiniGames } from "./pages/miniGames";
 import { renderLinkBelajar } from "./pages/linkBelajar";
@@ -541,6 +542,9 @@ async function renderMainLayout() {
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="learning-center">
               <i data-lucide="book-open" class="w-4 h-4 text-cyan-400"></i> Learning Center
             </button>
+            <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="latihan">
+              <i data-lucide="graduation-cap" class="w-4 h-4 text-rose-400"></i> Latihan & Ujian
+            </button>
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="tkj-hub">
               <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i> TKJ HUB
             </button>
@@ -672,6 +676,9 @@ async function renderMainLayout() {
         break;
       case "learning-center":
         renderLearningCenter(pageContent, activeUserSession);
+        break;
+      case "latihan":
+        renderLatihan(pageContent, activeUserSession);
         break;
       case "tkj-hub":
         renderTKJHub(pageContent, activeUserSession);
