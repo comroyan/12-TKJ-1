@@ -46,6 +46,9 @@ export function applyTheme() {
   const currentTheme = localStorage.getItem("classhub_theme") || "dark";
   const htmlEl = document.documentElement;
   
+  // Disable transitions temporarily during theme switch to prevent GPU texture artifacts and scanline glitches on mobile
+  htmlEl.classList.add("no-transitions");
+  
   if (currentTheme === "light") {
     htmlEl.classList.add("light-theme");
   } else {
@@ -79,6 +82,11 @@ export function applyTheme() {
     rootEl.offsetHeight; // Force layout reflow and invalidates GPU texture cache
     rootEl.style.visibility = originalVisibility;
   }
+
+  // Safely remove the no-transitions lock after a short delay so hover transitions remain functional afterwards
+  setTimeout(() => {
+    htmlEl.classList.remove("no-transitions");
+  }, 50);
 }
 
 export function toggleTheme() {

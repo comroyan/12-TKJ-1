@@ -47,12 +47,27 @@
 }
 
 .glass-card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card-hover:hover {
   transform: translateY(-2px);
   border-color: rgba(56, 189, 248, 0.3);
   box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.1);
+}
+
+/* Disable transitions temporarily during theme toggle to prevent GPU texture corruption and horizontal glitches on mobile */
+.no-transitions,
+.no-transitions *,
+.no-transitions *::before,
+.no-transitions *::after {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+  -webkit-animation: none !important;
+  -moz-animation: none !important;
+  -o-animation: none !important;
+  animation: none !important;
 }
 
 /* Technical Dashboard Theme Specific Classes */
