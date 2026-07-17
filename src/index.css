@@ -92,12 +92,8 @@
 }
 
 /* --- Light Mode Themes --- */
-.light-theme {
-  background-color: #f8fafc;
-  color: #0f172a;
-}
-
-/* Base elements in light theme */
+html.light-theme,
+.light-theme,
 .light-theme body,
 .light-theme .min-h-screen,
 .light-theme main {

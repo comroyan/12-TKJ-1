@@ -70,6 +70,15 @@ export function applyTheme() {
       }
     }
   });
+
+  // Force full browser reflow & repaint to clear GPU paint caches on mobile devices
+  const rootEl = document.getElementById("root");
+  if (rootEl) {
+    const originalVisibility = rootEl.style.visibility;
+    rootEl.style.visibility = "hidden";
+    rootEl.offsetHeight; // Force layout reflow and invalidates GPU texture cache
+    rootEl.style.visibility = originalVisibility;
+  }
 }
 
 export function toggleTheme() {
@@ -807,9 +816,11 @@ async function renderMainLayout() {
   // Theme Toggle listeners
   document.getElementById("themeToggleBtn")?.addEventListener("click", () => {
     toggleTheme();
+    routeToPage(currentActivePage);
   });
   document.getElementById("mobileThemeToggleBtn")?.addEventListener("click", () => {
     toggleTheme();
+    routeToPage(currentActivePage);
   });
 
   // Logout listener
