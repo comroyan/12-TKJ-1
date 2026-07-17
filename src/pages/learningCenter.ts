@@ -96,6 +96,7 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
   let activeTab = "materials"; // materials, quiz, summary, targets, pomodoro, stats, ai
   let searchMaterialQuery = "";
   let currentFilterSubject = "Semua";
+  let loadedSubjects: { id: string; name: string }[] = [];
 
   // Pomodoro States
   let pomodoroTimeLeft = 25 * 60;
@@ -107,6 +108,28 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
 
   async function loadData() {
     try {
+      // Fetch subjects from Firestore
+      try {
+        const subSnap = await getDocs(collection(db, "subjects"));
+        if (subSnap.empty) {
+          // Seed the database with the initial list of SUBJECTS
+          for (const sub of SUBJECTS) {
+            await addDoc(collection(db, "subjects"), {
+              name: sub,
+              createdAt: serverTimestamp()
+            });
+          }
+          const resnap = await getDocs(collection(db, "subjects"));
+          loadedSubjects = resnap.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        } else {
+          loadedSubjects = subSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        }
+      } catch (e) {
+        console.error("Error fetching subjects", e);
+        loadedSubjects = SUBJECTS.map((s, idx) => ({ id: `fallback-${idx}`, name: s }));
+      }
+      loadedSubjects.sort((a, b) => a.name.localeCompare(b.name));
+
       // Fetch materials
       const matSnap = await getDocs(query(collection(db, "materials"), orderBy("createdAt", "desc")));
       const materials = matSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -196,10 +219,15 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
                   <h3 class="text-sm font-bold text-white uppercase tracking-wider">Mata Pelajaran</h3>
                   <div class="space-y-1">
                     <button class="subject-filter-btn w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all ${currentFilterSubject === 'Semua' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-slate-400 hover:bg-slate-800/40'}" data-subject="Semua">Semua Pelajaran</button>
-                    ${SUBJECTS.map(subj => `
-                      <button class="subject-filter-btn w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all ${currentFilterSubject === subj ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-slate-400 hover:bg-slate-800/40'} truncate" data-subject="${subj}">${subj}</button>
+                    ${loadedSubjects.map(subObj => `
+                      <button class="subject-filter-btn w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all ${currentFilterSubject === subObj.name ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-slate-400 hover:bg-slate-800/40'} truncate" data-subject="${subObj.name}">${subObj.name}</button>
                     `).join("")}
                   </div>
+                  ${isTeacherOrAdmin ? `
+                    <button id="manageSubjectsBtn" class="w-full mt-2 py-2.5 bg-slate-800/80 hover:bg-slate-800 text-cyan-400 border border-slate-700 hover:border-cyan-500/20 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                      <i data-lucide="settings" class="w-3.5 h-3.5"></i> Kelola Mapel
+                    </button>
+                  ` : ""}
                 </div>
 
                 ${isTeacherOrAdmin ? `
@@ -219,6 +247,8 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   ${filteredMaterials.length > 0 ? filteredMaterials.map((m: any) => {
                     const isBookmarked = bookmarks.includes(m.id);
+                    const hasContent = m.content && m.content.trim().length > 0;
+                    const hasUrl = m.url && m.url !== "https://drive.google.com" && m.url !== "https://drive.google.com/";
                     return `
                       <div class="p-5 glass rounded-2xl flex flex-col justify-between border border-slate-850 hover:border-cyan-500/30 transition-all relative group">
                         <div>
@@ -241,9 +271,18 @@ export async function renderLearningCenter(container: HTMLElement, userSession: 
 
                         <div class="mt-4 pt-4 border-t border-slate-850 flex items-center justify-between">
                           <span class="text-[10px] text-slate-500 font-mono">${formatShortDate(m.createdAt)}</span>
-                          <a href="${m.url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5">
-                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Buka File
-                          </a>
+                          <div class="flex items-center gap-1.5">
+                            ${hasContent ? `
+                              <button class="read-text-material-btn px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer" data-id="${m.id}">
+                                <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Baca Teks
+                              </button>
+                            ` : ""}
+                            ${hasUrl || !hasContent ? `
+                              <a href="${m.url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 text-xs font-bold transition-all flex items-center gap-1">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Buka File
+                              </a>
+                            ` : ""}
+                          </div>
                         </div>
                       </div>
                     `;
@@ -708,6 +747,177 @@ Router(config-router)# network 10.0.0.0</pre>
       });
     });
 
+    // Manage Subjects Event (Kelola Mapel)
+    const manageSubjectsBtn = document.getElementById("manageSubjectsBtn");
+    if (manageSubjectsBtn) {
+      manageSubjectsBtn.addEventListener("click", () => {
+        Swal.fire({
+          title: "Kelola Mata Pelajaran",
+          background: "#0f172a",
+          color: "#f8fafc",
+          html: `
+            <div class="space-y-4 text-left">
+              <div class="flex gap-2">
+                <input type="text" id="newSubjectName" placeholder="Nama mata pelajaran baru..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm">
+                <button id="addNewSubjectBtn" class="px-4 py-2 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 text-sm transition-all cursor-pointer">Tambah</button>
+              </div>
+              <div class="border-t border-slate-800 pt-3">
+                <h4 class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Daftar Mata Pelajaran</h4>
+                <div class="max-h-60 overflow-y-auto space-y-1.5 scroll-hide" id="subjectsListContainer">
+                  ${loadedSubjects.map(s => `
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl hover:border-slate-700 transition-all">
+                      <span class="text-xs text-white truncate max-w-[200px] font-medium">${s.name}</span>
+                      <div class="flex items-center gap-1.5">
+                        <button class="edit-subject-btn p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer" data-id="${s.id}" data-name="${s.name}">
+                          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button class="delete-subject-btn p-1 hover:bg-rose-500/10 rounded text-slate-400 hover:text-rose-400 transition-colors cursor-pointer" data-id="${s.id}" data-name="${s.name}">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            </div>
+          `,
+          showConfirmButton: false,
+          showCancelButton: true,
+          cancelButtonText: "Tutup",
+          cancelButtonColor: "#475569",
+          didOpen: () => {
+            renderIcons();
+            
+            // Add subject
+            const addBtn = document.getElementById("addNewSubjectBtn");
+            const input = document.getElementById("newSubjectName") as HTMLInputElement;
+            if (addBtn && input) {
+              addBtn.addEventListener("click", async () => {
+                const name = input.value.trim();
+                if (!name) {
+                  toast.error("Nama mata pelajaran tidak boleh kosong.");
+                  return;
+                }
+                try {
+                  await addDoc(collection(db, "subjects"), {
+                    name,
+                    createdAt: serverTimestamp()
+                  });
+                  toast.success(`Mata pelajaran "${name}" berhasil ditambahkan.`);
+                  Swal.close();
+                  loadData();
+                } catch (err: any) {
+                  toast.error(err.message);
+                }
+              });
+            }
+
+            // Edit and delete handlers
+            const editBtns = document.querySelectorAll(".edit-subject-btn");
+            editBtns.forEach(btn => {
+              btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id")!;
+                const oldName = btn.getAttribute("data-name")!;
+                Swal.close();
+                
+                const { value: newName } = await Swal.fire({
+                  title: "Edit Mata Pelajaran",
+                  background: "#0f172a",
+                  color: "#f8fafc",
+                  input: "text",
+                  inputValue: oldName,
+                  showCancelButton: true,
+                  confirmButtonColor: "#06b6d4",
+                  cancelButtonColor: "#ef4444",
+                  confirmButtonText: "Simpan",
+                  cancelButtonText: "Batal",
+                  inputValidator: (value) => {
+                    if (!value.trim()) {
+                      return "Nama mata pelajaran tidak boleh kosong!";
+                    }
+                    return null;
+                  }
+                });
+
+                if (newName) {
+                  try {
+                    await updateDoc(doc(db, "subjects", id), {
+                      name: newName.trim()
+                    });
+                    toast.success("Mata pelajaran berhasil diubah.");
+                  } catch (err: any) {
+                    toast.error(err.message);
+                  }
+                  loadData();
+                }
+              });
+            });
+
+            const deleteBtns = document.querySelectorAll(".delete-subject-btn");
+            deleteBtns.forEach(btn => {
+              btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id")!;
+                const name = btn.getAttribute("data-name")!;
+                Swal.close();
+
+                const confirmResult = await Swal.fire({
+                  title: "Hapus Mata Pelajaran?",
+                  text: `Apakah Anda yakin ingin menghapus "${name}"? Tindakan ini tidak dapat dibatalkan.`,
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonColor: "#ef4444",
+                  cancelButtonColor: "#475569",
+                  confirmButtonText: "Ya, Hapus",
+                  cancelButtonText: "Batal",
+                  background: "#0f172a",
+                  color: "#f8fafc"
+                });
+
+                if (confirmResult.isConfirmed) {
+                  try {
+                    await deleteDoc(doc(db, "subjects", id));
+                    toast.success("Mata pelajaran berhasil dihapus.");
+                  } catch (err: any) {
+                    toast.error(err.message);
+                  }
+                  loadData();
+                }
+              });
+            });
+          }
+        });
+      });
+    }
+
+    // Read Text Material Event (Baca Teks)
+    const readBtns = document.querySelectorAll(".read-text-material-btn");
+    readBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const materialId = btn.getAttribute("data-id")!;
+        const matObj = materials.find((x: any) => x.id === materialId);
+        if (!matObj) return;
+
+        Swal.fire({
+          title: matObj.title,
+          background: "#0f172a",
+          color: "#f8fafc",
+          width: "600px",
+          html: `
+            <div class="text-left space-y-4 max-h-[70vh] overflow-y-auto pr-2 scroll-hide">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span class="px-2 py-0.5 text-[10px] font-bold font-mono rounded bg-slate-800 border border-slate-700 text-cyan-400">${matObj.subject}</span>
+                <span class="text-[10px] text-slate-500 font-mono">Diunggah oleh ${matObj.uploaderName || "Guru"}</span>
+              </div>
+              <p class="text-slate-400 text-xs italic">${matObj.description || ""}</p>
+              <div class="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-slate-900/60 p-4 rounded-xl border border-slate-800 select-text">${matObj.content || ""}</div>
+            </div>
+          `,
+          confirmButtonText: "Selesai Membaca",
+          confirmButtonColor: "#06b6d4"
+        });
+      });
+    });
+
     // Bookmark Toggle Event
     document.querySelectorAll(".bookmark-btn").forEach((btn: any) => {
       btn.addEventListener("click", async () => {
@@ -752,7 +962,7 @@ Router(config-router)# network 10.0.0.0</pre>
               <div>
                 <label class="block text-xs text-slate-400 font-semibold mb-1">Mata Pelajaran</label>
                 <select id="swSubject" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm">
-                  ${SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join("")}
+                  ${loadedSubjects.map(s => `<option value="${s.name}">${s.name}</option>`).join("")}
                 </select>
               </div>
               <div>
@@ -762,6 +972,10 @@ Router(config-router)# network 10.0.0.0</pre>
               <div>
                 <label class="block text-xs text-slate-400 font-semibold mb-1">Deskripsi Ringkas</label>
                 <textarea id="swDesc" placeholder="Materi dasar subnetting..." class="w-full h-16 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm resize-none"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 font-semibold mb-1">Isi Materi Berupa Teks / Modul (Opsional)</label>
+                <textarea id="swContent" placeholder="Tulis isi materi di sini (opsional)..." class="w-full h-40 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm font-sans resize-y"></textarea>
               </div>
               <div>
                 <label class="block text-xs text-slate-400 font-semibold mb-1">Link Google Drive / Youtube / Web (Opsional)</label>
@@ -782,6 +996,7 @@ Router(config-router)# network 10.0.0.0</pre>
             const subject = (document.getElementById("swSubject") as HTMLSelectElement).value;
             const title = (document.getElementById("swTitle") as HTMLInputElement).value.trim();
             const description = (document.getElementById("swDesc") as HTMLTextAreaElement).value.trim();
+            const content = (document.getElementById("swContent") as HTMLTextAreaElement).value.trim();
             const link = (document.getElementById("swLink") as HTMLInputElement).value.trim();
             const fileInput = document.getElementById("swFile") as HTMLInputElement;
             const file = fileInput.files ? fileInput.files[0] : null;
@@ -791,7 +1006,7 @@ Router(config-router)# network 10.0.0.0</pre>
               return false;
             }
 
-            return { subject, title, description, link, file };
+            return { subject, title, description, content, link, file };
           }
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -803,7 +1018,7 @@ Router(config-router)# network 10.0.0.0</pre>
               color: "#f8fafc"
             });
 
-            const { subject, title, description, link, file } = result.value;
+            const { subject, title, description, content, link, file } = result.value;
             let fileUrl = link;
 
             try {
@@ -820,6 +1035,7 @@ Router(config-router)# network 10.0.0.0</pre>
                 subject,
                 title,
                 description,
+                content: content || "",
                 url: fileUrl,
                 uploaderName: userSession.name,
                 createdAt: serverTimestamp()
@@ -1276,7 +1492,7 @@ Router(config-router)# network 10.0.0.0</pre>
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: text,
-              context: `Mata Pelajaran Kelas XII TKJ 1: ${SUBJECTS.join(", ")}.`
+              context: `Mata Pelajaran Kelas XII TKJ 1: ${loadedSubjects.map(s => s.name).join(", ")}.`
             })
           });
 

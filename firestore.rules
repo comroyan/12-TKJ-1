@@ -171,6 +171,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
+    match /subjects/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
     match /quizScores/{id} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
