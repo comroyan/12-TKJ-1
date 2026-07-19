@@ -9,6 +9,17 @@ import { adminCreateStudentAuthAndProfile } from "../firebase/auth";
 import { renderIcons, toast, confirmDialog } from "../utils/helpers";
 import Swal from "sweetalert2";
 
+function isTeacher(user: any) {
+  const roleLower = (user.role || "").toLowerCase();
+  const jabLower = (user.jabatan || "").toLowerCase();
+  return roleLower === "wali kelas" || 
+         roleLower === "guru" || 
+         jabLower.includes("wali") || 
+         jabLower.includes("guru") || 
+         !user.absen || 
+         user.absen === 0;
+}
+
 export async function renderAnggota(container: HTMLElement, userSession: any) {
   // Initial loading
   container.innerHTML = `
@@ -75,7 +86,7 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
         </div>
 
         <!-- Members Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="membersGrid">
+        <div class="space-y-8" id="membersGrid">
           <!-- Member cards will load here -->
         </div>
       </div>
@@ -88,90 +99,144 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
     const roleFilter = document.getElementById("roleFilter") as HTMLSelectElement;
     const statusFilter = document.getElementById("statusFilter") as HTMLSelectElement;
 
+    function renderCardHtml(student: any, isTeacherCard: boolean) {
+      const isSelf = student.id === userSession.uid;
+      const roleColors: any = {
+        "Super Admin": "bg-rose-500/10 text-rose-400 border border-rose-500/20",
+        "Wali Kelas": "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+        "Guru": "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
+        "Wakil": "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+        "Sekretaris": "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+        "Bendahara": "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+        "Anggota": "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+      };
+
+      const topBorderClass = isTeacherCard 
+        ? "border-t-emerald-500" 
+        : student.role === 'Super Admin' 
+          ? 'border-t-rose-500' 
+          : 'border-t-cyan-500/50';
+
+      const badgeLabel = isTeacherCard 
+        ? `<span class="absolute top-4 right-4 text-[10px] font-mono font-bold px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center gap-1">
+             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Pendidik
+           </span>`
+        : `<span class="absolute top-4 right-4 text-xs font-mono font-bold px-2 py-1 bg-slate-950/80 border border-slate-800 text-slate-400 rounded-xl">
+             Absen ${student.absen || "-"}
+           </span>`;
+
+      return `
+        <div class="glass rounded-3xl p-6 relative overflow-hidden group glass-card-hover border-t-4 ${topBorderClass}">
+          ${badgeLabel}
+          
+          <div class="flex items-start gap-4">
+            <img src="${student.foto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'}" alt="${student.name}" class="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md">
+            <div class="space-y-1">
+              <h3 class="text-base font-bold text-white leading-snug group-hover:text-cyan-400 transition-colors">${student.name}</h3>
+              <span class="inline-block text-[10px] font-mono font-semibold tracking-wider uppercase px-2 py-0.5 rounded-lg ${roleColors[student.role] || roleColors['Anggota']}">
+                ${student.jabatan || (isTeacherCard ? "Guru" : "Siswa")}
+              </span>
+              <span class="block text-xs text-slate-500">UID: ${student.id.substring(0,6)}...</span>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-400 mt-4 italic line-clamp-2 leading-relaxed">"${student.bio || 'Tidak ada bio'}"</p>
+
+          <div class="mt-4 pt-4 border-t border-slate-800 space-y-2">
+            ${!isTeacherCard ? `
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-500"></i> 
+              <span>PKL: <strong class="text-slate-200">${student.tempatPkl || "-"}</strong></span>
+            </div>
+            ` : `
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="book-open" class="w-3.5 h-3.5 text-emerald-400"></i> 
+              <span>Tugas Utama: <strong class="text-emerald-400">${student.jabatan || "Wali Kelas / Guru"}</strong></span>
+            </div>
+            `}
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="bell" class="w-3.5 h-3.5 text-yellow-500"></i> 
+              <span>Status: <span class="capitalize font-semibold ${student.status === 'aktif' ? 'text-emerald-400' : 'text-rose-400'}">${student.status || 'aktif'}</span></span>
+            </div>
+          </div>
+
+          <!-- Social Links & Action Drawer -->
+          <div class="mt-4 flex items-center justify-between gap-2 pt-2">
+            <div class="flex items-center gap-2">
+              ${student.hp ? `
+                <a href="https://wa.me/${student.hp.replace(/\D/g, '')}" target="_blank" class="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="WhatsApp">
+                  <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                </a>
+              ` : ""}
+              ${student.instagram ? `
+                <a href="https://instagram.com/${student.instagram}" target="_blank" class="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 transition-colors" title="Instagram">
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                </a>
+              ` : ""}
+            </div>
+
+            <!-- Admin controls -->
+            <div class="flex items-center gap-1">
+              ${isSAdmin || isSelf ? `
+                <button class="editBtn p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-colors" data-uid="${student.id}" title="Edit Profil">
+                  <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ""}
+              ${isSAdmin && !isSelf ? `
+                <button class="deleteBtn p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 transition-colors" data-uid="${student.id}" data-name="${student.name}" title="Hapus Akun">
+                  <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ""}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function renderCards(filteredStudents: any[]) {
       if (filteredStudents.length === 0) {
         membersGrid.innerHTML = `
-          <div class="col-span-full py-12 text-center">
+          <div class="py-12 text-center">
             <div class="inline-flex p-4 bg-slate-800/50 rounded-full text-slate-500 mb-3"><i data-lucide="users" class="w-8 h-8"></i></div>
-            <p class="text-slate-400">Siswa tidak ditemukan.</p>
+            <p class="text-slate-400">Anggota tidak ditemukan.</p>
           </div>
         `;
         renderIcons();
         return;
       }
 
-      membersGrid.innerHTML = filteredStudents.map((student: any) => {
-        const isSelf = student.id === userSession.uid;
-        const roleColors: any = {
-          "Super Admin": "bg-rose-500/10 text-rose-400 border border-rose-500/20",
-          "Wakil": "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-          "Sekretaris": "bg-purple-500/10 text-purple-400 border border-purple-500/20",
-          "Bendahara": "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-          "Anggota": "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-        };
+      const teachers = filteredStudents.filter(s => isTeacher(s));
+      const studentsOnly = filteredStudents.filter(s => !isTeacher(s));
 
-        return `
-          <div class="glass rounded-3xl p-6 relative overflow-hidden group glass-card-hover border-t-4 ${student.role === 'Super Admin' ? 'border-t-rose-500' : 'border-t-cyan-500/50'}">
-            <span class="absolute top-4 right-4 text-xs font-mono font-bold px-2 py-1 bg-slate-950/80 border border-slate-800 text-slate-400 rounded-xl">
-              Absen ${student.absen}
-            </span>
-            
-            <div class="flex items-start gap-4">
-              <img src="${student.foto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop'}" alt="${student.name}" class="w-16 h-16 rounded-2xl object-cover border border-slate-800 shadow-md">
-              <div class="space-y-1">
-                <h3 class="text-base font-bold text-white leading-snug group-hover:text-cyan-400 transition-colors">${student.name}</h3>
-                <span class="inline-block text-[10px] font-mono font-semibold tracking-wider uppercase px-2 py-0.5 rounded-lg ${roleColors[student.role] || roleColors['Anggota']}">
-                  ${student.jabatan}
-                </span>
-                <span class="block text-xs text-slate-500">UID: ${student.id.substring(0,6)}...</span>
-              </div>
-            </div>
+      let html = "";
 
-            <p class="text-xs text-slate-400 mt-4 italic line-clamp-2 leading-relaxed">"${student.bio || 'Tidak ada bio'}"</p>
-
-            <div class="mt-4 pt-4 border-t border-slate-800 space-y-2">
-              <div class="flex items-center gap-2 text-xs text-slate-400">
-                <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-500"></i> 
-                <span>PKL: <strong class="text-slate-200">${student.tempatPkl || "-"}</strong></span>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-slate-400">
-                <i data-lucide="bell" class="w-3.5 h-3.5 text-yellow-500"></i> 
-                <span>Status: <span class="capitalize font-semibold ${student.status === 'aktif' ? 'text-emerald-400' : 'text-rose-400'}">${student.status || 'aktif'}</span></span>
-              </div>
-            </div>
-
-            <!-- Social Links & Action Drawer -->
-            <div class="mt-4 flex items-center justify-between gap-2 pt-2">
-              <div class="flex items-center gap-2">
-                ${student.hp ? `
-                  <a href="https://wa.me/${student.hp.replace(/\D/g, '')}" target="_blank" class="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-colors" title="WhatsApp">
-                    <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                  </a>
-                ` : ""}
-                ${student.instagram ? `
-                  <a href="https://instagram.com/${student.instagram}" target="_blank" class="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 transition-colors" title="Instagram">
-                    <i data-lucide="image" class="w-3.5 h-3.5"></i>
-                  </a>
-                ` : ""}
-              </div>
-
-              <!-- Admin controls -->
-              <div class="flex items-center gap-1">
-                ${isSAdmin || isSelf ? `
-                  <button class="editBtn p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 transition-colors" data-uid="${student.id}" title="Edit Profil">
-                    <i data-lucide="edit" class="w-3.5 h-3.5"></i>
-                  </button>
-                ` : ""}
-                ${isSAdmin && !isSelf ? `
-                  <button class="deleteBtn p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 transition-colors" data-uid="${student.id}" data-name="${student.name}" title="Hapus Akun">
-                    <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
-                  </button>
-                ` : ""}
-              </div>
+      if (teachers.length > 0) {
+        html += `
+          <div class="space-y-4">
+            <h2 class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Wali Kelas & Staf Pengajar
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${teachers.map(t => renderCardHtml(t, true)).join("")}
             </div>
           </div>
         `;
-      }).join("");
+      }
+
+      if (studentsOnly.length > 0) {
+        html += `
+          <div class="space-y-4 pt-4">
+            <h2 class="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <i data-lucide="graduation-cap" class="w-4 h-4 text-cyan-400"></i> Daftar Siswa Kelas XII TKJ 1 (${studentsOnly.length} Orang)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${studentsOnly.map(s => renderCardHtml(s, false)).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      membersGrid.innerHTML = html;
 
       renderIcons();
 
@@ -229,10 +294,10 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
                     <button type="button" id="toggleAllStudents" class="text-[10px] text-cyan-400 hover:underline">Semua / Kosongkan</button>
                   </div>
                   <div class="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-1 mt-1.5">
-                    ${students.filter((s: any) => (s.status || "aktif") !== "nonaktif").map((s: any) => `
+                    ${students.filter((s: any) => (s.status || "aktif") !== "nonaktif" && !isTeacher(s)).map((s: any) => `
                       <label class="flex items-center gap-2 p-1.5 bg-slate-950/50 border border-slate-800/60 rounded-lg cursor-pointer hover:border-cyan-500/30 transition-all">
                         <input type="checkbox" name="gmStudentCheck" value="${s.id}" data-name="${s.name}" checked class="accent-cyan-500 rounded">
-                        <span class="text-[10px] text-slate-300 line-clamp-1">Absen ${s.absen} - ${s.name}</span>
+                        <span class="text-[10px] text-slate-300 line-clamp-1">Absen ${s.absen || "-"} - ${s.name}</span>
                       </label>
                     `).join("")}
                   </div>
@@ -584,6 +649,8 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
                     <option value="Bendahara">Bendahara</option>
                     <option value="Sekretaris">Sekretaris</option>
                     <option value="Wakil">Wakil</option>
+                    <option value="Wali Kelas">Wali Kelas</option>
+                    <option value="Guru">Guru</option>
                     <option value="Super Admin">Super Admin</option>
                   </select>
                 </div>
@@ -687,6 +754,8 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
                   <option value="Bendahara" ${student.role === 'Bendahara' ? 'selected' : ''}>Bendahara</option>
                   <option value="Sekretaris" ${student.role === 'Sekretaris' ? 'selected' : ''}>Sekretaris</option>
                   <option value="Wakil" ${student.role === 'Wakil' ? 'selected' : ''}>Wakil</option>
+                  <option value="Wali Kelas" ${student.role === 'Wali Kelas' ? 'selected' : ''}>Wali Kelas</option>
+                  <option value="Guru" ${student.role === 'Guru' ? 'selected' : ''}>Guru</option>
                   <option value="Super Admin" ${student.role === 'Super Admin' ? 'selected' : ''}>Super Admin</option>
                 </select>
               </div>

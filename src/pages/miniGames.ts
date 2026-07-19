@@ -127,7 +127,48 @@ function playRetroSound(type: "click" | "success" | "error" | "coin" | "levelup"
   }
 }
 
+// Global tracker for active timers in the miniGames page to prevent any memory leak or dual-running game timer bugs
+let activeIntervals: any[] = [];
+let activeTimeouts: any[] = [];
+let activeAnimationFrames: any[] = [];
+
+export function cleanupMiniGames() {
+  console.log(`[MiniGames Cleanup] Clearing ${activeIntervals.length} intervals, ${activeTimeouts.length} timeouts, and ${activeAnimationFrames.length} animation frames.`);
+  activeIntervals.forEach(id => clearInterval(id));
+  activeTimeouts.forEach(id => clearTimeout(id));
+  activeAnimationFrames.forEach(id => cancelAnimationFrame(id));
+  activeIntervals = [];
+  activeTimeouts = [];
+  activeAnimationFrames = [];
+}
+
 export async function renderMiniGames(container: HTMLElement, userSession: any) {
+  // Local shadowed timer wrappers for automatic background tracking and foolproof cleanup
+  const originalSetInterval = window.setInterval;
+  const originalSetTimeout = window.setTimeout;
+  const originalRequestAnimationFrame = window.requestAnimationFrame;
+
+  const setInterval = (fn: any, delay?: any) => {
+    const id = originalSetInterval(fn, delay);
+    activeIntervals.push(id);
+    return id;
+  };
+
+  const setTimeout = (fn: any, delay?: any) => {
+    const id = originalSetTimeout(fn, delay);
+    activeTimeouts.push(id);
+    return id;
+  };
+
+  const requestAnimationFrame = (callback: any) => {
+    const id = originalRequestAnimationFrame(callback);
+    activeAnimationFrames.push(id);
+    return id;
+  };
+
+  // Stop any leftover timers immediately upon entering or re-entering
+  cleanupMiniGames();
+
   // Styles for the card flips and matching games
   const styleEl = document.createElement("style");
   styleEl.innerHTML = `
@@ -683,6 +724,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
     document.querySelectorAll(".launch-game-btn").forEach((btn: any) => {
       btn.addEventListener("click", () => {
         playRetroSound("click");
+        cleanupMiniGames(); // Stop any currently active game loop or countdown timers
         activeGame = btn.dataset.game;
         renderUI().then(() => {
           initActiveGame();
@@ -694,6 +736,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
     document.querySelectorAll(".game-tab-btn").forEach((btn: any) => {
       btn.addEventListener("click", () => {
         playRetroSound("click");
+        cleanupMiniGames(); // Stop any currently active game loop or countdown timers
         activeTab = btn.dataset.tab;
         activeGame = null;
         renderUI().then(() => {
@@ -757,6 +800,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
     if (exitGameBtn) {
       exitGameBtn.addEventListener("click", () => {
         playRetroSound("click");
+        cleanupMiniGames(); // Stop any currently active game loop or countdown timers when returning to the game menu
         activeGame = null;
         renderUI();
       });

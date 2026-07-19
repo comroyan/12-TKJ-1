@@ -30,7 +30,7 @@ import { renderLogs } from "./pages/logs";
 import { renderLearningCenter } from "./pages/learningCenter";
 import { renderLatihan } from "./pages/latihan";
 import { renderTKJHub } from "./pages/tkjHub";
-import { renderMiniGames } from "./pages/miniGames";
+import { renderMiniGames, cleanupMiniGames } from "./pages/miniGames";
 import { renderLinkBelajar } from "./pages/linkBelajar";
 import { renderDiskusi, cleanupDiskusiListener } from "./pages/diskusi";
 import { renderSubmissions } from "./pages/submissions";
@@ -713,6 +713,10 @@ async function renderMainLayout() {
     // Clean up active real-time diskusichat listener to prevent lag, active read cost and memory leak
     if (page !== "diskusi") {
       cleanupDiskusiListener();
+    }
+    // Clean up mini-games background timers to prevent memory leaks and double-firing timers
+    if (page !== "mini-games") {
+      cleanupMiniGames();
     }
     currentActivePage = page;
     navItems.forEach((btn: any) => {
