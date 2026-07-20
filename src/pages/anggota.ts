@@ -628,7 +628,7 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
       const addStudentBtn = document.getElementById("addStudentBtn") as HTMLButtonElement;
       addStudentBtn.addEventListener("click", () => {
         Swal.fire({
-          title: "Tambah Siswa Baru",
+          title: "Tambah Anggota / Siswa Baru",
           background: "#0f172a",
           color: "#f8fafc",
           html: `
@@ -639,16 +639,16 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-xs text-slate-400 font-semibold mb-1">Nomor Absen</label>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1" id="labelAbsen">Nomor Absen</label>
                   <input type="number" id="mAbsen" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
                 </div>
                 <div>
                   <label class="block text-xs text-slate-400 font-semibold mb-1">Peranan Aplikasi</label>
                   <select id="mRole" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:border-cyan-500 text-white outline-none text-sm">
-                    <option value="Anggota">Anggota</option>
-                    <option value="Bendahara">Bendahara</option>
-                    <option value="Sekretaris">Sekretaris</option>
-                    <option value="Wakil">Wakil</option>
+                    <option value="Anggota">Siswa (Anggota)</option>
+                    <option value="Bendahara">Siswa (Bendahara)</option>
+                    <option value="Sekretaris">Siswa (Sekretaris)</option>
+                    <option value="Wakil">Siswa (Wakil)</option>
                     <option value="Wali Kelas">Wali Kelas</option>
                     <option value="Guru">Guru</option>
                     <option value="Super Admin">Super Admin</option>
@@ -672,11 +672,48 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
             </div>
           `,
           showCancelButton: true,
-          confirmButtonText: "Simpan Siswa",
+          confirmButtonText: "Simpan Anggota",
           cancelButtonText: "Batal",
           confirmButtonColor: "#06b6d4",
           cancelButtonColor: "#334155",
           focusConfirm: false,
+          didOpen: () => {
+            const mRole = document.getElementById("mRole") as HTMLSelectElement;
+            const mAbsen = document.getElementById("mAbsen") as HTMLInputElement;
+            const mJabatan = document.getElementById("mJabatan") as HTMLInputElement;
+            const mPassword = document.getElementById("mPassword") as HTMLInputElement;
+            const labelAbsen = document.getElementById("labelAbsen") as HTMLLabelElement;
+
+            const updateFields = () => {
+              const val = mRole.value;
+              const isTeacherOrAdmin = val === "Guru" || val === "Wali Kelas" || val === "Super Admin";
+              if (isTeacherOrAdmin) {
+                mAbsen.value = "";
+                mAbsen.disabled = true;
+                mAbsen.classList.add("opacity-50");
+                labelAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
+                if (val === "Guru") {
+                  mJabatan.value = "Guru Mata Pelajaran";
+                  mPassword.value = "Guru@TKJ1_2026";
+                } else if (val === "Wali Kelas") {
+                  mJabatan.value = "Wali Kelas XII TKJ 1";
+                  mPassword.value = "WaliKelas@TKJ1_2026";
+                } else {
+                  mJabatan.value = "Super Admin";
+                  mPassword.value = "Admin@TKJ1_2026";
+                }
+              } else {
+                mAbsen.disabled = false;
+                mAbsen.classList.remove("opacity-50");
+                labelAbsen.innerHTML = `Nomor Absen`;
+                mJabatan.value = val === "Anggota" ? "Siswa" : val;
+                mPassword.value = "Siswa@TKJ1_2026";
+              }
+            };
+
+            mRole.addEventListener("change", updateFields);
+            updateFields();
+          },
           preConfirm: () => {
             const name = (document.getElementById("mName") as HTMLInputElement).value.trim();
             const absen = (document.getElementById("mAbsen") as HTMLInputElement).value.trim();
@@ -685,11 +722,13 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
             const role = (document.getElementById("mRole") as HTMLSelectElement).value;
             const jabatan = (document.getElementById("mJabatan") as HTMLInputElement).value.trim();
 
-            if (!name || !absen || !email || !password) {
+            const isTeacherOrAdmin = role === "Guru" || role === "Wali Kelas" || role === "Super Admin";
+
+            if (!name || (!isTeacherOrAdmin && !absen) || !email || !password) {
               Swal.showValidationMessage("Harap isi semua kolom wajib!");
               return false;
             }
-            return { name, absen, email, password, role, jabatan };
+            return { name, absen: isTeacherOrAdmin ? "0" : absen, email, password, role, jabatan };
           }
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -737,8 +776,8 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs text-slate-400 font-semibold mb-1">Nomor Absen</label>
-              <input type="number" id="eAbsen" value="${student.absen}" ${!isSAdmin ? "disabled" : ""} class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm disabled:opacity-50">
+              <label class="block text-xs text-slate-400 font-semibold mb-1" id="labelEditAbsen">Nomor Absen</label>
+              <input type="number" id="eAbsen" value="${student.absen || ''}" ${!isSAdmin ? "disabled" : ""} class="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none text-sm disabled:opacity-50">
             </div>
             <div>
               <label class="block text-xs text-slate-400 font-semibold mb-1">Jabatan Struktur</label>
@@ -797,6 +836,50 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
       cancelButtonText: "Batal",
       confirmButtonColor: "#06b6d4",
       cancelButtonColor: "#334155",
+      didOpen: () => {
+        const eRole = document.getElementById("eRole") as HTMLSelectElement;
+        const eAbsen = document.getElementById("eAbsen") as HTMLInputElement;
+        const eJabatan = document.getElementById("eJabatan") as HTMLInputElement;
+        const labelEditAbsen = document.getElementById("labelEditAbsen") as HTMLLabelElement;
+
+        if (eRole && eAbsen && labelEditAbsen) {
+          const updateFields = () => {
+            const val = eRole.value;
+            const isTeacherOrAdmin = val === "Guru" || val === "Wali Kelas" || val === "Super Admin";
+            if (isTeacherOrAdmin) {
+              eAbsen.value = "";
+              eAbsen.disabled = true;
+              eAbsen.classList.add("opacity-50");
+              labelEditAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
+              if (eJabatan) {
+                if (val === "Guru" && (!eJabatan.value || eJabatan.value === "Siswa")) {
+                  eJabatan.value = "Guru Mata Pelajaran";
+                } else if (val === "Wali Kelas" && (!eJabatan.value || eJabatan.value === "Siswa")) {
+                  eJabatan.value = "Wali Kelas XII TKJ 1";
+                }
+              }
+            } else {
+              eAbsen.disabled = false;
+              eAbsen.classList.remove("opacity-50");
+              labelEditAbsen.innerHTML = `Nomor Absen`;
+              if (eJabatan && (eJabatan.value === "Guru Mata Pelajaran" || eJabatan.value === "Wali Kelas XII TKJ 1" || eJabatan.value === "Super Admin")) {
+                eJabatan.value = val === "Anggota" ? "Siswa" : val;
+              }
+            }
+          };
+
+          eRole.addEventListener("change", updateFields);
+          updateFields();
+        } else if (eAbsen && labelEditAbsen) {
+          const isTeacherOrAdmin = student.role === "Guru" || student.role === "Wali Kelas" || student.role === "Super Admin";
+          if (isTeacherOrAdmin) {
+            eAbsen.value = "";
+            eAbsen.disabled = true;
+            eAbsen.classList.add("opacity-50");
+            labelEditAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
+          }
+        }
+      },
       preConfirm: () => {
         const updateData: any = {
           tempatPkl: (document.getElementById("ePkl") as HTMLInputElement).value.trim(),
@@ -808,12 +891,15 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
 
         if (isSAdmin) {
           updateData.name = (document.getElementById("eName") as HTMLInputElement).value.trim();
-          updateData.absen = parseInt((document.getElementById("eAbsen") as HTMLInputElement).value);
           updateData.jabatan = (document.getElementById("eJabatan") as HTMLInputElement).value.trim();
           updateData.role = (document.getElementById("eRole") as HTMLSelectElement).value;
           updateData.status = (document.getElementById("eStatus") as HTMLSelectElement).value;
 
-          if (!updateData.name || isNaN(updateData.absen)) {
+          const isTeacherOrAdmin = updateData.role === "Guru" || updateData.role === "Wali Kelas" || updateData.role === "Super Admin";
+          const eAbsenVal = (document.getElementById("eAbsen") as HTMLInputElement).value.trim();
+          updateData.absen = isTeacherOrAdmin ? 0 : parseInt(eAbsenVal);
+
+          if (!updateData.name || (!isTeacherOrAdmin && isNaN(updateData.absen))) {
             Swal.showValidationMessage("Nama dan Absen harus valid!");
             return false;
           }
