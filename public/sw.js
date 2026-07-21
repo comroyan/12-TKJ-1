@@ -62,3 +62,26 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(e.request));
   }
 });
+
+// Handle notification click to open or focus the app window
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If a tab is already open, focus it
+      if (clientList.length > 0) {
+        let client = clientList[0];
+        for (let i = 0; i < clientList.length; i++) {
+          if (clientList[i].focused) {
+            client = clientList[i];
+            break;
+          }
+        }
+        return client.focus();
+      }
+      // Otherwise open a new window
+      return self.clients.openWindow("/");
+    })
+  );
+});
+

@@ -14,6 +14,9 @@ export async function renderProfile(container: HTMLElement, userSession: any) {
   async function loadAndRender() {
     const settings = await getSystemSettings();
     const isSAdmin = userSession.role === "Super Admin";
+    const isZainurroyan = userSession.email === "zainurroyan@classhub.local" || 
+                          (userSession.name && userSession.name.toLowerCase().includes("zainurroyan")) || 
+                          userSession.uid === "zSQScq4FZyWwxuJ684r2fuB0a642";
 
     container.innerHTML = `
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
@@ -129,6 +132,27 @@ export async function renderProfile(container: HTMLElement, userSession: any) {
             </div>
           </div>
 
+          <!-- Admin Recovery Card (Visible only to Zainurroyan for self-recovery) -->
+          ${isZainurroyan ? `
+            <div class="glass p-6 rounded-3xl bg-slate-950/40 border border-rose-500/30 shadow-lg shadow-rose-950/20">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-2">
+                <i data-lucide="shield-alert" class="text-rose-400 w-4.5 h-4.5"></i> Pemulihan Akses Admin
+              </h3>
+              <p class="text-xs text-slate-400 leading-relaxed mb-4">
+                Sistem mengenali Anda sebagai akun pendiri/pemilik (<strong>Zainurroyan</strong>). Gunakan tombol di bawah jika Anda tidak sengaja mengubah jabatan atau peranan untuk mengembalikan akses penuh Anda.
+              </p>
+              ${!isSAdmin ? `
+                <button id="restoreAdminBtn" class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-slate-950 font-bold rounded-xl transition-all text-xs">
+                  Pulihkan Peranan Ketua Kelas
+                </button>
+              ` : `
+                <div class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+                  <span class="text-[10px] text-emerald-400 font-semibold">Status Anda saat ini aktif sebagai Super Admin</span>
+                </div>
+              `}
+            </div>
+          ` : ""}
+
           <!-- PWA Information Card -->
           <div class="glass p-6 rounded-3xl bg-slate-900/10 border border-slate-800/50">
             <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-2">
@@ -164,6 +188,66 @@ export async function renderProfile(container: HTMLElement, userSession: any) {
       if (userSession.foto) pFoto.value = userSession.foto;
       if (userSession.bio) pBio.value = userSession.bio;
     } catch(e){}
+
+    // Restore Admin click listener
+    const restoreAdminBtn = document.getElementById("restoreAdminBtn");
+    if (restoreAdminBtn) {
+      restoreAdminBtn.addEventListener("click", async () => {
+        const confirmResult = await Swal.fire({
+          title: "Pulihkan Peranan Anda?",
+          text: "Status peranan Anda akan diubah kembali menjadi Super Admin & Ketua Kelas di basis data.",
+          icon: "question",
+          background: "#0f172a",
+          color: "#f8fafc",
+          showCancelButton: true,
+          confirmButtonText: "Ya, Pulihkan",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#e11d48",
+          cancelButtonColor: "#334155"
+        });
+
+        if (confirmResult.isConfirmed) {
+          try {
+            Swal.fire({
+              title: "Memulihkan...",
+              background: "#0f172a",
+              color: "#f8fafc",
+              didOpen: () => {
+                Swal.showLoading();
+              }
+            });
+
+            await updateStudentUser(userSession.uid, {
+              role: "Super Admin",
+              jabatan: "Ketua Kelas"
+            });
+
+            // Sync session
+            userSession.role = "Super Admin";
+            userSession.jabatan = "Ketua Kelas";
+
+            await Swal.fire({
+              title: "Akses Berhasil Dipulihkan!",
+              text: "Anda telah kembali menjadi Ketua Kelas & Super Admin.",
+              icon: "success",
+              background: "#0f172a",
+              color: "#f8fafc",
+              confirmButtonColor: "#06b6d4"
+            });
+
+            window.location.reload();
+          } catch (err: any) {
+            Swal.fire({
+              title: "Gagal Pulih",
+              text: err.message,
+              icon: "error",
+              background: "#0f172a",
+              color: "#f8fafc"
+            });
+          }
+        }
+      });
+    }
 
     // Profile form submit
     const profileForm = document.getElementById("profileForm") as HTMLFormElement;

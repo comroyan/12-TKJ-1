@@ -21,6 +21,12 @@ service cloud.firestore {
       return hasRole('Super Admin');
     }
 
+    function isBootstrapAdmin(userId) {
+      return isSignedIn() && 
+             request.auth.uid == userId && 
+             (request.auth.token.email == 'zainurroyan@classhub.local' || userId == 'zSQScq4FZyWwxuJ684r2fuB0a642');
+    }
+
     function isSetupNotCompleted() {
       return !exists(/databases/$(database)/documents/settings/setup_status) || 
              get(/databases/$(database)/documents/settings/setup_status).data.completed != true;
@@ -70,6 +76,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isSuperAdmin() || 
         isSetupNotCompleted() ||
+        isBootstrapAdmin(userId) ||
         (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']))
       );
       allow delete: if isSuperAdmin();

@@ -11,6 +11,17 @@ import {
 import { formatRupiah, renderIcons, isOddWeek, toast, requestNotificationPermission } from "../utils/helpers";
 import Swal from "sweetalert2";
 
+function isTeacher(user: any) {
+  const roleLower = (user.role || "").toLowerCase();
+  const jabLower = (user.jabatan || "").toLowerCase();
+  return roleLower === "wali kelas" || 
+         roleLower === "guru" || 
+         jabLower.includes("wali") || 
+         jabLower.includes("guru") || 
+         !user.absen || 
+         user.absen === 0;
+}
+
 export async function renderDashboard(container: HTMLElement, userSession: any) {
   // Loading skeleton
   container.innerHTML = `
@@ -30,7 +41,7 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   `;
 
   // Fetch all dashboard relevant data in parallel including customizable countdown targets
-  const [students, funds, tasks, agendas, schedules, pickets, countdownSettings] = await Promise.all([
+  const [allUsers, funds, tasks, agendas, schedules, pickets, countdownSettings] = await Promise.all([
     getStudentUsers(),
     getClassFunds(),
     getTasks(),
@@ -39,6 +50,8 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
     getPickets(),
     getCountdownSettings()
   ]);
+
+  const students = allUsers.filter((u: any) => !isTeacher(u));
 
   // Check if current user has Class President/Editor privilege to edit countdowns
   const isKetuaKelas = userSession.role === "Super Admin" || 

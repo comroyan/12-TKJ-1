@@ -3,7 +3,8 @@ import {
   addSaluranPost, 
   updateSaluranPost, 
   deleteSaluranPost, 
-  getStudentUsers 
+  getStudentUsers,
+  createNotification
 } from "../firebase/db";
 import { renderIcons, formatDate, toast, confirmDialog } from "../utils/helpers";
 import Swal from "sweetalert2";
@@ -335,7 +336,13 @@ export async function renderSaluran(container: HTMLElement, userSession: any) {
           if (result.isConfirmed) {
             try {
               await addSaluranPost(result.value);
-              toast.success("Siaran berhasil dikirim ke saluran!");
+
+              // Send real-time notification to class members
+              const notificationTitle = `Siaran Saluran: ${result.value.category}`;
+              const notificationContent = `📢 "${result.value.title}" oleh ${result.value.authorName} (${result.value.authorJabatan}).`;
+              await createNotification(notificationTitle, notificationContent, "info");
+
+              toast.success("Siaran berhasil dikirim ke saluran & notifikasi terkirim!");
               loadAndRender();
             } catch (err: any) {
               Swal.fire("Gagal", err.message, "error");

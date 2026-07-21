@@ -199,7 +199,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
   `;
 
   let activeTab = "games"; // games, shop, leaderboard
-  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | "flappy_packet" | "fiber_splicer" | "vlan_patch" | "firewall_breaker" | null = null;
+  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | "flappy_packet" | "fiber_splicer" | "vlan_patch" | "firewall_breaker" | "endless_shooter" | "dino_chrome" | null = null;
 
   const isKetuaKelas = userSession.role === "Super Admin" || 
                        userSession.role === "Ketua Kelas" || 
@@ -561,6 +561,34 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                   </div>
                   <button class="launch-game-btn w-full py-2.5 bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="firewall_breaker">
                     Hancurkan Ancaman 🛡️
+                  </button>
+                </div>
+
+                <!-- Game 12: TKJ Cyber Defender (Endless Shooter) -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-cyan-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xl">
+                      <i data-lucide="shield" class="w-6 h-6 animate-pulse"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">TKJ Cyber Defender</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Game 2D Endless Shooter! Kendalikan Core Router untuk menembak jatuh serangan DDoS, Trojan, dan Malware sebelum membobol bandwidth kelas.</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="endless_shooter">
+                    Pertahankan Jaringan 🚀
+                  </button>
+                </div>
+
+                <!-- Game 13: Offline RJ45 Runner (TKJ Chrome Dino) -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-emerald-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
+                      <i data-lucide="wifi-off" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">Offline RJ45 Runner</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Game Dino Chrome klasik bertema TKJ! Bantu Teknisi melompati tumpukan Tang Crimping, Gulungan Kabel RJ45, dan Server Rack untuk mengembalikan koneksi internet!</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="dino_chrome">
+                    Hubungkan RJ45 🏃‍♂️
                   </button>
                 </div>
               </div>
@@ -989,6 +1017,10 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
       initVlanPatchGame(playground);
     } else if (activeGame === "firewall_breaker") {
       initFirewallBreakerGame(playground);
+    } else if (activeGame === "endless_shooter") {
+      initEndlessShooterGame(playground);
+    } else if (activeGame === "dino_chrome") {
+      initDinoChromeGame(playground);
     }
   }
 
@@ -4778,6 +4810,1453 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
       gameActive = true;
       createBricks();
       createBall();
+      gameLoop();
+    });
+  }
+
+  // -------------------------------------------------------------
+  // GAME 12: TKJ CYBER DEFENDER (2D ENDLESS SHOOTER)
+  // -------------------------------------------------------------
+  function initEndlessShooterGame(p: HTMLElement) {
+    let score = 0;
+    let level = 1;
+    let bandwidth = 100; // Player's bandwidth health percentage
+    let gameActive = false;
+    let animationFrameId: number | null = null;
+
+    // Canvas size
+    const canvasWidth = 480;
+    const canvasHeight = 360;
+
+    p.innerHTML = `
+      <div class="space-y-6 max-w-lg mx-auto font-sans animate-fadeIn">
+        <div class="text-center space-y-1">
+          <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5">
+            <i data-lucide="shield" class="w-4 h-4 text-cyan-400 animate-pulse"></i> TKJ Cyber Defender
+          </h2>
+          <p class="text-xs text-slate-400 font-sans">Kendalikan Core Router untuk menembak jatuh ancaman DDoS, Trojan, dan Malware!</p>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-mono px-2">
+          <span class="text-slate-400">Threats Cleared: <strong class="text-cyan-400 text-sm" id="shooterScore">0</strong></span>
+          <span class="text-emerald-400 font-bold">Level: <span id="shooterLevel">1</span></span>
+          <span class="text-rose-400 font-bold flex items-center gap-1">
+            Bandwidth: <span id="shooterBandwidth" class="font-bold text-cyan-400">100%</span>
+          </span>
+        </div>
+
+        <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-center items-center">
+          <canvas id="shooterCanvas" width="${canvasWidth}" height="${canvasHeight}" class="w-full h-full block cursor-crosshair"></canvas>
+          
+          <!-- Start overlay -->
+          <div id="shooterStartOverlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center space-y-4 z-10">
+            <div class="w-14 h-14 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/10">
+              <i data-lucide="play" class="w-6 h-6 animate-pulse"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-sm font-bold text-white">Inisialisasi Pertahanan Core Router</h3>
+              <p class="text-[11px] text-slate-400 max-w-xs">Gunakan mouse/sentuhan (geser) untuk mengontrol router pelindung di layar, atau tombol panah keyboard.</p>
+              <p class="text-[10px] text-cyan-400/80">Paket data PING ditembakkan otomatis! Kumpulkan power-up F, B, S, C!</p>
+            </div>
+            <button id="startShooterBtn" class="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer">
+              MULAI SEKARANG 🚀
+            </button>
+          </div>
+        </div>
+
+        <!-- Touch Controls for Mobile/Tablet players -->
+        <div class="grid grid-cols-2 gap-4">
+          <button id="btnShooterLeft" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-cyan-500/10 active:text-cyan-400 rounded-2xl flex items-center justify-center cursor-pointer transition-all select-none">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <button id="btnShooterRight" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-cyan-500/10 active:text-cyan-400 rounded-2xl flex items-center justify-center cursor-pointer transition-all select-none">
+            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    renderIcons();
+
+    const canvas = document.getElementById("shooterCanvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    const startOverlay = document.getElementById("shooterStartOverlay");
+    const scoreEl = document.getElementById("shooterScore");
+    const levelEl = document.getElementById("shooterLevel");
+    const bandwidthEl = document.getElementById("shooterBandwidth");
+
+    // Game states / entities
+    let playerX = canvasWidth / 2;
+    let playerY = canvasHeight - 35;
+    const playerWidth = 32;
+    const playerHeight = 24;
+    const playerSpeed = 5;
+
+    interface Bullet {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      damage: number;
+    }
+    let bullets: Bullet[] = [];
+
+    interface Enemy {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      hp: number;
+      maxHp: number;
+      points: number;
+      color: string;
+      name: string;
+      shootCooldown?: number;
+      wobbleSeed?: number;
+    }
+    let enemies: Enemy[] = [];
+
+    interface EnemyBullet {
+      x: number;
+      y: number;
+      vy: number;
+      radius: number;
+      color: string;
+    }
+    let enemyBullets: EnemyBullet[] = [];
+
+    interface PowerUp {
+      x: number;
+      y: number;
+      type: "F" | "B" | "S" | "C"; // F: Fiber (fire rate), B: Bandwidth (triple), S: Shield (heal), C: Cache Clean (clear)
+      color: string;
+      vy: number;
+      radius: number;
+    }
+    let powerups: PowerUp[] = [];
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      alpha: number;
+      life: number;
+      maxLife: number;
+    }
+    let particles: Particle[] = [];
+
+    // Keys state
+    const keys: { [key: string]: boolean } = {};
+    let touchLeft = false;
+    let touchRight = false;
+
+    // Shooting speed and shot upgrades
+    let shootCooldown = 0;
+    let maxShootCooldown = 25; // in frames (lower = faster)
+    let bulletType: "single" | "triple" = "single";
+    let activeShield = false; // Active firewall shield absorbing 1 hit
+
+    // Timers
+    let spawnTimer = 0;
+    let spawnInterval = 90; // frames between spawns (gets lower as level increases)
+
+    function spawnEnemy() {
+      const radius = 12 + Math.random() * 12;
+      const x = radius + Math.random() * (canvasWidth - radius * 2);
+      const y = -radius;
+
+      // Enemy types list based on level
+      const types = [
+        { name: "Malware Worm", hp: 1, points: 10, color: "#22c55e", vy: 1.2 + level * 0.1, vx: 0 },
+        { name: "Trojan Horse", hp: 2, points: 25, color: "#ef4444", vy: 1.8 + level * 0.15, vx: 0 }
+      ];
+
+      if (level >= 2) {
+        types.push({ name: "IP Conflict", hp: 3, points: 40, color: "#f97316", vy: 1.5 + level * 0.1, vx: (Math.random() - 0.5) * 0.8 });
+      }
+      if (level >= 3) {
+        types.push({ name: "DDoS Bot", hp: 6, points: 80, color: "#a855f7", vy: 0.8 + level * 0.05, vx: (Math.random() - 0.5) * 0.5 });
+      }
+
+      const selected = types[Math.floor(Math.random() * types.length)];
+      enemies.push({
+        x,
+        y,
+        vx: selected.vx,
+        vy: selected.vy,
+        radius,
+        hp: selected.hp + Math.floor(level / 2),
+        maxHp: selected.hp + Math.floor(level / 2),
+        points: selected.points,
+        color: selected.color,
+        name: selected.name,
+        shootCooldown: selected.name === "DDoS Bot" ? 50 : undefined,
+        wobbleSeed: Math.random() * 100
+      });
+    }
+
+    function createExplosion(x: number, y: number, color: string, count = 8) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 3;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 1.5 + Math.random() * 2,
+          color,
+          alpha: 1,
+          life: 0,
+          maxLife: 20 + Math.random() * 15
+        });
+      }
+    }
+
+    function triggerScreenFlash() {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
+
+    function applyPowerUp(type: "F" | "B" | "S" | "C") {
+      playRetroSound("coin");
+      if (type === "F") {
+        maxShootCooldown = Math.max(10, maxShootCooldown - 4);
+        toast.success("Fiber Optic Speed Boost! Kecepatan PING Meningkat!");
+      } else if (type === "B") {
+        bulletType = "triple";
+        toast.success("Bandwidth Booster! UDP Flooding Aktif!");
+        // revert triple shot after 8 seconds
+        setTimeout(() => {
+          if (gameActive) {
+            bulletType = "single";
+            toast.info("Bandwidth kembali normal.");
+          }
+        }, 8000);
+      } else if (type === "S") {
+        bandwidth = Math.min(100, bandwidth + 30);
+        if (bandwidthEl) bandwidthEl.textContent = `${bandwidth}%`;
+        activeShield = true;
+        toast.success("Firewall Terenkripsi! Bandwidth Dipulihkan + Tameng Aktif!");
+      } else if (type === "C") {
+        triggerScreenFlash();
+        enemies.forEach(e => {
+          score += e.points;
+          createExplosion(e.x, e.y, e.color, 12);
+        });
+        enemies = [];
+        enemyBullets = [];
+        if (scoreEl) scoreEl.textContent = `${score}`;
+        toast.success("Cache Cleaned! Semua Ancaman Terhapus Dari RAM!");
+      }
+    }
+
+    function update() {
+      // 1. Move Player
+      if (keys["ArrowLeft"] || keys["a"] || keys["A"] || touchLeft) {
+        playerX -= playerSpeed;
+      }
+      if (keys["ArrowRight"] || keys["d"] || keys["D"] || touchRight) {
+        playerX += playerSpeed;
+      }
+      if (keys["ArrowUp"] || keys["w"] || keys["W"]) {
+        playerY -= playerSpeed;
+      }
+      if (keys["ArrowDown"] || keys["s"] || keys["S"]) {
+        playerY += playerSpeed;
+      }
+
+      // Constrain player
+      if (playerX < playerWidth / 2) playerX = playerWidth / 2;
+      if (playerX > canvasWidth - playerWidth / 2) playerX = canvasWidth - playerWidth / 2;
+      if (playerY < canvasHeight / 2) playerY = canvasHeight / 2;
+      if (playerY > canvasHeight - 15) playerY = canvasHeight - 15;
+
+      // 2. Auto-Shooting
+      shootCooldown--;
+      if (shootCooldown <= 0) {
+        shootCooldown = maxShootCooldown;
+        playRetroSound("tick");
+
+        if (bulletType === "single") {
+          bullets.push({
+            x: playerX,
+            y: playerY - playerHeight / 2,
+            vx: 0,
+            vy: -5,
+            radius: 3,
+            color: "#06b6d4",
+            damage: 1
+          });
+        } else {
+          bullets.push({
+            x: playerX,
+            y: playerY - playerHeight / 2,
+            vx: 0,
+            vy: -5.5,
+            radius: 3,
+            color: "#22d3ee",
+            damage: 1
+          });
+          bullets.push({
+            x: playerX,
+            y: playerY - playerHeight / 2,
+            vx: -1.5,
+            vy: -4.8,
+            radius: 3,
+            color: "#06b6d4",
+            damage: 1
+          });
+          bullets.push({
+            x: playerX,
+            y: playerY - playerHeight / 2,
+            vx: 1.5,
+            vy: -4.8,
+            radius: 3,
+            color: "#06b6d4",
+            damage: 1
+          });
+        }
+      }
+
+      // 3. Spawn enemies
+      spawnTimer++;
+      if (spawnTimer >= spawnInterval) {
+        spawnTimer = 0;
+        spawnEnemy();
+        spawnInterval = Math.max(40, 95 - level * 8);
+      }
+
+      // 4. Update Bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        if (b.y < -b.radius || b.x < -b.radius || b.x > canvasWidth + b.radius) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      // 5. Update Enemy Bullets
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+        eb.y += eb.vy;
+
+        const dist = Math.hypot(eb.x - playerX, eb.y - playerY);
+        if (dist < eb.radius + 12) {
+          enemyBullets.splice(i, 1);
+          playerHit();
+          continue;
+        }
+
+        if (eb.y > canvasHeight + eb.radius) {
+          enemyBullets.splice(i, 1);
+        }
+      }
+
+      // 6. Update Enemies
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        e.x += e.vx;
+        e.y += e.vy;
+
+        if (e.name === "Malware Worm" && e.wobbleSeed !== undefined) {
+          e.x += Math.sin(e.y * 0.05 + e.wobbleSeed) * 0.8;
+        }
+
+        if (e.shootCooldown !== undefined) {
+          e.shootCooldown--;
+          if (e.shootCooldown <= 0) {
+            e.shootCooldown = Math.max(40, 75 - level * 5);
+            enemyBullets.push({
+              x: e.x,
+              y: e.y + e.radius,
+              vy: 2.8,
+              radius: 4,
+              color: "#f43f5e"
+            });
+          }
+        }
+
+        if (e.y - e.radius > canvasHeight) {
+          enemies.splice(i, 1);
+          bandwidth = Math.max(0, bandwidth - 15);
+          if (bandwidthEl) bandwidthEl.textContent = `${bandwidth}%`;
+          playRetroSound("error");
+          toast.error("Ancaman lolos! Bandwidth berkurang!");
+          if (bandwidth <= 0) {
+            handleGameOver();
+          }
+          continue;
+        }
+
+        const distToPlayer = Math.hypot(e.x - playerX, e.y - playerY);
+        if (distToPlayer < e.radius + 14) {
+          enemies.splice(i, 1);
+          createExplosion(e.x, e.y, e.color, 12);
+          playerHit();
+          continue;
+        }
+
+        for (let j = bullets.length - 1; j >= 0; j--) {
+          const b = bullets[j];
+          const distToBullet = Math.hypot(e.x - b.x, e.y - b.y);
+          if (distToBullet < e.radius + b.radius) {
+            e.hp -= b.damage;
+            bullets.splice(j, 1);
+            createExplosion(b.x, b.y, "#22d3ee", 3);
+
+            if (e.hp <= 0) {
+              enemies.splice(i, 1);
+              createExplosion(e.x, e.y, e.color, 10);
+              score += e.points;
+              if (scoreEl) scoreEl.textContent = `${score}`;
+
+              const targetLevel = Math.floor(score / 350) + 1;
+              if (targetLevel > level) {
+                level = targetLevel;
+                if (levelEl) levelEl.textContent = `${level}`;
+                playRetroSound("levelup");
+                toast.success(`Bandwidth Naik ke Level ${level}! Server Dipercepat!`);
+              }
+
+              if (Math.random() < 0.15) {
+                const pTypes: ("F" | "B" | "S" | "C")[] = ["F", "B", "S", "C"];
+                const pColor = { F: "#f43f5e", B: "#06b6d4", S: "#10b981", C: "#eab308" };
+                const chosen = pTypes[Math.floor(Math.random() * pTypes.length)];
+                powerups.push({
+                  x: e.x,
+                  y: e.y,
+                  type: chosen,
+                  color: pColor[chosen],
+                  vy: 1.5,
+                  radius: 8
+                });
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // 7. Update Powerups
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const pu = powerups[i];
+        pu.y += pu.vy;
+
+        const dist = Math.hypot(pu.x - playerX, pu.y - playerY);
+        if (dist < pu.radius + 14) {
+          applyPowerUp(pu.type);
+          powerups.splice(i, 1);
+          continue;
+        }
+
+        if (pu.y > canvasHeight + pu.radius) {
+          powerups.splice(i, 1);
+        }
+      }
+
+      // 8. Update Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life++;
+        pt.alpha = 1 - pt.life / pt.maxLife;
+
+        if (pt.life >= pt.maxLife) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function playerHit() {
+      if (activeShield) {
+        activeShield = false;
+        toast.info("Firewall Shield hancur menahan serangan!");
+        playRetroSound("error");
+        return;
+      }
+
+      bandwidth = Math.max(0, bandwidth - 20);
+      if (bandwidthEl) bandwidthEl.textContent = `${bandwidth}%`;
+      playRetroSound("error");
+      toast.error("Core Router terhantam serangan!");
+      triggerScreenFlash();
+
+      if (bandwidth <= 0) {
+        handleGameOver();
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Draw scrolling cyber grid
+      ctx.strokeStyle = "rgba(6, 182, 212, 0.05)";
+      ctx.lineWidth = 1;
+      const gridSize = 24;
+      const scrollOffset = (Date.now() / 35) % gridSize;
+
+      for (let x = 0; x < canvasWidth; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvasHeight);
+        ctx.stroke();
+      }
+      for (let y = scrollOffset; y < canvasHeight; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvasWidth, y);
+        ctx.stroke();
+      }
+
+      // Draw player (Cisco Router design)
+      ctx.fillStyle = "#0891b2";
+      ctx.beginPath();
+      ctx.roundRect(playerX - playerWidth / 2, playerY - playerHeight / 2, playerWidth, playerHeight, 4);
+      ctx.fill();
+
+      // Antenna ports
+      ctx.fillStyle = "#22d3ee";
+      ctx.fillRect(playerX - playerWidth / 2 + 4, playerY - playerHeight / 2 - 3, 4, 3);
+      ctx.fillRect(playerX + playerWidth / 2 - 8, playerY - playerHeight / 2 - 3, 4, 3);
+
+      // Flashing ports
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = Date.now() % 500 > 250 ? "#22c55e" : "#0284c7";
+        ctx.beginPath();
+        ctx.arc(playerX - playerWidth / 2 + 6 + i * 7, playerY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Shield overlay
+      if (activeShield) {
+        ctx.strokeStyle = "#10b981";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(playerX, playerY, playerWidth - 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Bullets
+      bullets.forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(6, 182, 212, 0.3)";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius + 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Enemy bullets
+      enemyBullets.forEach(eb => {
+        ctx.fillStyle = eb.color;
+        ctx.beginPath();
+        ctx.arc(eb.x, eb.y, eb.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(244, 63, 94, 0.3)";
+        ctx.beginPath();
+        ctx.arc(eb.x, eb.y, eb.radius + 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Enemies
+      enemies.forEach(e => {
+        ctx.fillStyle = e.color;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#1e293b";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius - 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = e.color;
+        ctx.font = "bold 8px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        let symbol = "W";
+        if (e.name === "Trojan Horse") symbol = "T";
+        if (e.name === "IP Conflict") symbol = "IP";
+        if (e.name === "DDoS Bot") symbol = "DDoS";
+        ctx.fillText(symbol, e.x, e.y);
+
+        if (e.hp < e.maxHp) {
+          const barWidth = e.radius * 1.5;
+          const barHeight = 3;
+          const barX = e.x - barWidth / 2;
+          const barY = e.y - e.radius - 6;
+
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+          ctx.fillRect(barX, barY, barWidth, barHeight);
+
+          ctx.fillStyle = "#ef4444";
+          ctx.fillRect(barX, barY, barWidth * (e.hp / e.maxHp), barHeight);
+        }
+      });
+
+      // Powerups
+      powerups.forEach(pu => {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.beginPath();
+        ctx.arc(pu.x, pu.y, pu.radius + 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = pu.color;
+        ctx.beginPath();
+        ctx.arc(pu.x, pu.y, pu.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#000000";
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pu.type, pu.x, pu.y);
+      });
+
+      // Particles
+      particles.forEach(pt => {
+        ctx.fillStyle = pt.color;
+        ctx.globalAlpha = pt.alpha;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+    }
+
+    function gameLoop() {
+      if (!gameActive) return;
+      update();
+      draw();
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function setupInput() {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        keys[e.key] = true;
+      };
+      const handleKeyUp = (e: KeyboardEvent) => {
+        keys[e.key] = false;
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keyup", handleKeyUp);
+
+      const handleMouseMove = (e: MouseEvent) => {
+        const rect = canvas.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        const relativeY = e.clientY - rect.top;
+        const scaleX = canvasWidth / rect.width;
+        const scaleY = canvasHeight / rect.height;
+        playerX = relativeX * scaleX;
+        playerY = relativeY * scaleY;
+
+        if (playerX < playerWidth / 2) playerX = playerWidth / 2;
+        if (playerX > canvasWidth - playerWidth / 2) playerX = canvasWidth - playerWidth / 2;
+        if (playerY < canvasHeight / 2) playerY = canvasHeight / 2;
+        if (playerY > canvasHeight - 15) playerY = canvasHeight - 15;
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length > 0) {
+          const touch = e.touches[0];
+          const rect = canvas.getBoundingClientRect();
+          const relativeX = touch.clientX - rect.left;
+          const relativeY = touch.clientY - rect.top;
+          const scaleX = canvasWidth / rect.width;
+          const scaleY = canvasHeight / rect.height;
+          playerX = relativeX * scaleX;
+          playerY = relativeY * scaleY;
+
+          if (playerX < playerWidth / 2) playerX = playerWidth / 2;
+          if (playerX > canvasWidth - playerWidth / 2) playerX = canvasWidth - playerWidth / 2;
+          if (playerY < canvasHeight / 2) playerY = canvasHeight / 2;
+          if (playerY > canvasHeight - 15) playerY = canvasHeight - 15;
+        }
+      };
+
+      canvas.addEventListener("mousemove", handleMouseMove);
+      canvas.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+      const btnL = document.getElementById("btnShooterLeft");
+      const btnR = document.getElementById("btnShooterRight");
+
+      const lStart = () => { touchLeft = true; };
+      const lEnd = () => { touchLeft = false; };
+      const rStart = () => { touchRight = true; };
+      const rEnd = () => { touchRight = false; };
+
+      btnL?.addEventListener("mousedown", lStart);
+      btnL?.addEventListener("mouseup", lEnd);
+      btnL?.addEventListener("mouseleave", lEnd);
+      btnL?.addEventListener("touchstart", (e) => { e.preventDefault(); lStart(); });
+      btnL?.addEventListener("touchend", lEnd);
+
+      btnR?.addEventListener("mousedown", rStart);
+      btnR?.addEventListener("mouseup", rEnd);
+      btnR?.addEventListener("mouseleave", rEnd);
+      btnR?.addEventListener("touchstart", (e) => { e.preventDefault(); rStart(); });
+      btnR?.addEventListener("touchend", rEnd);
+
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("keyup", handleKeyUp);
+        canvas.removeEventListener("mousemove", handleMouseMove);
+        canvas.removeEventListener("touchmove", handleTouchMove);
+      };
+    }
+
+    const inputCleanup = setupInput();
+
+    async function handleGameOver() {
+      gameActive = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      inputCleanup();
+
+      const earnedXp = Math.min(80, (score * 0.1) + 10);
+      const earnedCoins = Math.min(50, (score * 0.05) + 5);
+
+      p.innerHTML = `
+        <div class="space-y-6 max-w-md mx-auto text-center font-sans animate-fadeIn">
+          <div class="w-16 h-16 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-cyan-500/10">
+            <i data-lucide="shield" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-xl font-bold text-white">Bandwidth Limit Tercapai!</h2>
+            <p class="text-xs text-slate-400">Kerja bagus, kamu berhasil melindungi server kelas XII TKJ 1 dari badai request ancaman siber!</p>
+          </div>
+
+          <div class="p-6 bg-slate-950/50 rounded-3xl border border-slate-850 space-y-4">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Ancaman Dimusnahkan:</span>
+              <span class="font-mono font-bold text-cyan-400 text-lg">${score} Poin</span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Level Server Tercapai:</span>
+              <span class="font-mono font-bold text-emerald-400">Server Level ${level}</span>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 flex justify-around text-center">
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">XP DIDAPAT</span>
+                <span class="text-base font-bold text-emerald-400">+${Math.floor(earnedXp)} XP</span>
+              </div>
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">KOIN EMAS</span>
+                <span class="text-base font-bold text-yellow-400">+${Math.floor(earnedCoins)} Koin</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="exitShooterBtn" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-[1.01] cursor-pointer shadow-lg shadow-cyan-500/10">
+            KLAIM HADIAH & KELUAR
+          </button>
+        </div>
+      `;
+      renderIcons();
+
+      document.getElementById("exitShooterBtn")?.addEventListener("click", async () => {
+        playRetroSound("click");
+        p.innerHTML = `
+          <div class="flex items-center justify-center py-12">
+            <div class="spinner"></div>
+            <span class="ml-3 text-slate-400">Menyimpan skor...</span>
+          </div>
+        `;
+        if (score > 0) {
+          await addRewards(Math.floor(earnedXp), Math.floor(earnedCoins), `TKJ Cyber Defender (${score} Poin, Server Lvl ${level})`);
+        }
+        activeGame = null;
+        loadGameProfile();
+      });
+    }
+
+    document.getElementById("startShooterBtn")?.addEventListener("click", () => {
+      if (startOverlay) startOverlay.style.display = "none";
+      playRetroSound("success");
+      gameActive = true;
+      gameLoop();
+    });
+  }
+
+  // -------------------------------------------------------------
+  // GAME 13: OFFLINE RJ45 RUNNER (TKJ CHROME DINO)
+  // -------------------------------------------------------------
+  function initDinoChromeGame(p: HTMLElement) {
+    let score = 0;
+    let highscore = 0;
+    let gameActive = false;
+    let animationFrameId: number | null = null;
+
+    // Load Highscore from localStorage or profile
+    try {
+      const storedHighScore = localStorage.getItem(`dino_high_${userSession.uid}`);
+      if (storedHighScore) highscore = parseInt(storedHighScore) || 0;
+    } catch (_) {}
+
+    // Canvas size
+    const canvasWidth = 480;
+    const canvasHeight = 300;
+
+    p.innerHTML = `
+      <div class="space-y-6 max-w-lg mx-auto font-sans animate-fadeIn">
+        <div class="text-center space-y-1">
+          <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5">
+            <i data-lucide="wifi-off" class="w-4 h-4 text-emerald-400"></i> Offline RJ45 Runner
+          </h2>
+          <p class="text-xs text-slate-400 font-sans">Bantu teknisi TKJ melompati rintangan jaringan untuk menyambung koneksi internet!</p>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-mono px-2">
+          <span class="text-slate-400">Current Score: <strong class="text-emerald-400 text-sm" id="dinoScore">0</strong></span>
+          <span class="text-yellow-400 font-bold">High Score: <span id="dinoHighScore">${highscore}</span></span>
+          <span class="text-cyan-400 font-bold">Speed Multiplier: <span id="dinoSpeed">1.0x</span></span>
+        </div>
+
+        <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-center items-center">
+          <canvas id="dinoCanvas" width="${canvasWidth}" height="${canvasHeight}" class="w-full h-full block cursor-pointer"></canvas>
+          
+          <!-- Start/Restart overlay -->
+          <div id="dinoStartOverlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center space-y-4 z-10">
+            <div class="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/10 animate-bounce">
+              <i data-lucide="wifi-off" class="w-6 h-6"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-sm font-bold text-white">Sambungan Internet Terputus!</h3>
+              <p class="text-[11px] text-slate-400 max-w-xs">Melompati Tang Crimping, Kabel UTP, dan Server Rack untuk merekonstruksi bandwidth!</p>
+              <p class="text-[10px] text-emerald-400/80 font-mono">Tekan SPASI / UP untuk Melompat, DOWN untuk Merunduk!</p>
+            </div>
+            <button id="startDinoBtn" class="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer">
+              MULAI RUNNER 🏃‍♂️
+            </button>
+          </div>
+        </div>
+
+        <!-- Touch Controls for Mobile/Tablet players -->
+        <div class="grid grid-cols-2 gap-4">
+          <button id="btnDinoJump" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-emerald-500/10 active:text-emerald-400 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all select-none gap-1">
+            <i data-lucide="chevrons-up" class="w-5 h-5"></i>
+            <span class="text-[10px] font-bold uppercase tracking-wider">LOMPAT (TAP/UP)</span>
+          </button>
+          <button id="btnDinoDuck" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-emerald-500/10 active:text-emerald-400 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all select-none gap-1">
+            <i data-lucide="chevrons-down" class="w-5 h-5"></i>
+            <span class="text-[10px] font-bold uppercase tracking-wider">RUNDUK (DOWN)</span>
+          </button>
+        </div>
+      </div>
+    `;
+    renderIcons();
+
+    const canvas = document.getElementById("dinoCanvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    const startOverlay = document.getElementById("dinoStartOverlay");
+    const scoreEl = document.getElementById("dinoScore");
+    const highScoreEl = document.getElementById("dinoHighScore");
+    const speedEl = document.getElementById("dinoSpeed");
+
+    // Game Variables
+    let gameSpeed = 4.5;
+    const groundY = canvasHeight - 40;
+
+    // Player (Technician) variables
+    const playerWidth = 24;
+    const playerHeight = 44;
+    let playerX = 50;
+    let playerY = groundY - playerHeight;
+    let playerVy = 0;
+    let isJumping = false;
+    let isDucking = false;
+    const gravity = 0.45;
+    const jumpForce = -8.5;
+
+    // Animation frames for player running
+    let runFrame = 0;
+
+    interface Obstacle {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      type: "tang" | "kabel" | "rack" | "ip_conflict";
+      color: string;
+      label: string;
+      passed: boolean;
+    }
+    let obstacles: Obstacle[] = [];
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      alpha: number;
+      life: number;
+      maxLife: number;
+    }
+    let particles: Particle[] = [];
+
+    // Background decoration (clouds / Ethernet packets floating)
+    interface Cloud {
+      x: number;
+      y: number;
+      width: number;
+      speed: number;
+      text: string;
+    }
+    let clouds: Cloud[] = [];
+
+    // Keys State
+    const keys: { [key: string]: boolean } = {};
+
+    function resetGame() {
+      score = 0;
+      gameSpeed = 4.5;
+      playerVy = 0;
+      playerY = groundY - playerHeight;
+      isJumping = false;
+      isDucking = false;
+      obstacles = [];
+      particles = [];
+      clouds = [
+        { x: 100, y: 50, width: 40, speed: 0.3, text: "WiFi Signal" },
+        { x: 300, y: 80, width: 60, speed: 0.2, text: "Cloud Database" },
+        { x: 450, y: 40, width: 50, speed: 0.4, text: "Optical Link" }
+      ];
+      if (scoreEl) scoreEl.textContent = "0";
+      if (speedEl) speedEl.textContent = "1.0x";
+    }
+
+    function spawnObstacle() {
+      // Determine obstacle type
+      const rand = Math.random();
+      let type: "tang" | "kabel" | "rack" | "ip_conflict";
+      let width = 20;
+      let height = 30;
+      let y = groundY - height;
+      let color = "#ef4444";
+      let label = "Tang";
+
+      if (rand < 0.28) {
+        type = "tang";
+        width = 16;
+        height = 32;
+        y = groundY - height;
+        color = "#ef4444"; // Red for crimping plier handles
+        label = "Tang";
+      } else if (rand < 0.56) {
+        type = "kabel";
+        width = 24;
+        height = 20;
+        y = groundY - height;
+        color = "#3b82f6"; // Blue for UTP cable rolls
+        label = "Kabel";
+      } else if (rand < 0.8) {
+        type = "rack";
+        width = 28;
+        height = 42;
+        y = groundY - height;
+        color = "#64748b"; // Server gray
+        label = "Rack";
+      } else {
+        // Flying obstacle! Needs ducking.
+        type = "ip_conflict";
+        width = 22;
+        height = 20;
+        // Float above the ground at head height
+        y = groundY - 45;
+        color = "#f59e0b"; // Orange Warning
+        label = "IP Conflict";
+      }
+
+      // Ensure minimal distance from the last obstacle
+      if (obstacles.length > 0) {
+        const last = obstacles[obstacles.length - 1];
+        if (canvasWidth - last.x < 140) {
+          return; // Skip spawning too close
+        }
+      }
+
+      obstacles.push({
+        x: canvasWidth + 20,
+        y,
+        width,
+        height,
+        type,
+        color,
+        label,
+        passed: false
+      });
+    }
+
+    function createExplosion(x: number, y: number, color: string, count = 10) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 2.5;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 1 + Math.random() * 2,
+          color,
+          alpha: 1,
+          life: 0,
+          maxLife: 20 + Math.random() * 15
+        });
+      }
+    }
+
+    // Spawn obstacles at intervals
+    let obstacleTimer = 0;
+
+    function update() {
+      // 1. Speed escalation
+      gameSpeed += 0.0008;
+      if (speedEl) speedEl.textContent = `${(gameSpeed / 4.5).toFixed(1)}x`;
+
+      // 2. Score progression
+      score++;
+      if (scoreEl) scoreEl.textContent = `${score}`;
+
+      // Update High Score dynamically
+      if (score > highscore) {
+        highscore = score;
+        if (highScoreEl) highScoreEl.textContent = `${highscore}`;
+        try {
+          localStorage.setItem(`dino_high_${userSession.uid}`, highscore.toString());
+        } catch (_) {}
+      }
+
+      // 3. Player Physics (Jumping / Ducking)
+      // Check Keyboard input
+      if (keys["ArrowUp"] || keys["Space"] || keys["w"] || keys["W"]) {
+        if (!isJumping && !isDucking) {
+          playerVy = jumpForce;
+          isJumping = true;
+          playRetroSound("tick");
+        }
+      }
+
+      if (keys["ArrowDown"] || keys["s"] || keys["S"]) {
+        if (!isJumping) {
+          isDucking = true;
+        }
+      } else {
+        isDucking = false;
+      }
+
+      // Apply Gravity
+      if (isJumping) {
+        playerVy += gravity;
+        playerY += playerVy;
+
+        const currentHeight = isDucking ? playerHeight / 2 : playerHeight;
+        if (playerY >= groundY - currentHeight) {
+          playerY = groundY - currentHeight;
+          playerVy = 0;
+          isJumping = false;
+        }
+      } else {
+        // Grounded height adjustment based on Ducking state
+        const currentHeight = isDucking ? playerHeight / 2 : playerHeight;
+        playerY = groundY - currentHeight;
+      }
+
+      // Running legs animation
+      if (!isJumping) {
+        runFrame += 0.15;
+      }
+
+      // 4. Update Background Decor (Clouds / Packets)
+      clouds.forEach(c => {
+        c.x -= c.speed * (gameSpeed * 0.4);
+        if (c.x < -c.width - 50) {
+          c.x = canvasWidth + 50 + Math.random() * 100;
+          c.y = 30 + Math.random() * 70;
+        }
+      });
+
+      // 5. Update Obstacles
+      obstacleTimer++;
+      const baseSpawnRate = Math.max(45, 95 - Math.floor(gameSpeed * 3));
+      if (obstacleTimer >= baseSpawnRate + Math.random() * 30) {
+        obstacleTimer = 0;
+        spawnObstacle();
+      }
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= gameSpeed;
+
+        // Collision Check (AABB with slight padding)
+        const currentWidth = playerWidth;
+        const currentHeight = isDucking ? playerHeight / 2 : playerHeight;
+
+        const pLeft = playerX + 2;
+        const pRight = playerX + currentWidth - 2;
+        const pTop = playerY + 2;
+        const pBottom = playerY + currentHeight;
+
+        const oLeft = obs.x + 1;
+        const oRight = obs.x + obs.width - 1;
+        const oTop = obs.y + 1;
+        const oBottom = obs.y + obs.height;
+
+        // Check if overlaps
+        if (pRight > oLeft && pLeft < oRight && pBottom > oTop && pTop < oBottom) {
+          createExplosion(playerX + playerWidth / 2, playerY + currentHeight / 2, "#f43f5e", 15);
+          createExplosion(obs.x + obs.width / 2, obs.y + obs.height / 2, obs.color, 12);
+          playRetroSound("error");
+          handleGameOver();
+          return;
+        }
+
+        // Check if passed successfully
+        if (!obs.passed && obs.x + obs.width < playerX) {
+          obs.passed = true;
+          // Award tiny point burst
+          score += 25;
+          if (Math.random() < 0.2) {
+            playRetroSound("coin");
+          }
+        }
+
+        // Remove out-of-screen obstacles
+        if (obs.x < -obs.width - 10) {
+          obstacles.splice(i, 1);
+        }
+      }
+
+      // 6. Update Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life++;
+        pt.alpha = 1 - pt.life / pt.maxLife;
+
+        if (pt.life >= pt.maxLife) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function draw() {
+      // Clear canvas
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Draw digital grid background lines (matrix vibe)
+      ctx.strokeStyle = "rgba(16, 185, 129, 0.04)";
+      ctx.lineWidth = 1;
+      const gridSize = 20;
+      for (let x = 0; x < canvasWidth; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvasHeight);
+        ctx.stroke();
+      }
+
+      // Draw scrolling packets/clouds decoration
+      clouds.forEach(c => {
+        ctx.fillStyle = "rgba(16, 185, 129, 0.08)";
+        ctx.fillRect(c.x, c.y, c.width, 16);
+        ctx.fillStyle = "rgba(16, 185, 129, 0.4)";
+        ctx.font = "8px monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(c.text, c.x + 4, c.y + 11);
+      });
+
+      // Draw digital UTP cable ground line
+      ctx.fillStyle = "#064e3b";
+      ctx.fillRect(0, groundY, canvasWidth, canvasHeight - groundY);
+
+      // Ethernet cable stripes on the ground
+      ctx.fillStyle = "#10b981";
+      const groundOffset = (Date.now() / 20) % 40;
+      for (let x = -groundOffset; x < canvasWidth; x += 40) {
+        ctx.fillRect(x, groundY + 2, 12, 3);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x + 12, groundY + 2, 4, 3); // White stripe
+        ctx.fillStyle = "#10b981";
+      }
+
+      // Draw obstacles
+      obstacles.forEach(obs => {
+        // Outer glow
+        ctx.fillStyle = obs.color;
+        ctx.shadowColor = obs.color;
+        ctx.shadowBlur = 6;
+
+        ctx.beginPath();
+        ctx.roundRect(obs.x, obs.y, obs.width, obs.height, 4);
+        ctx.fill();
+
+        // Reset shadow
+        ctx.shadowBlur = 0;
+
+        // Custom detailing per obstacle
+        ctx.fillStyle = "#020617";
+        ctx.font = "bold 7px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(obs.label, obs.x + obs.width / 2, obs.y + obs.height / 2 + 2);
+
+        // Server rack blinking lights
+        if (obs.type === "rack") {
+          for (let row = 0; row < 3; row++) {
+            ctx.fillStyle = (Date.now() % 600 > row * 200) ? "#10b981" : "#ef4444";
+            ctx.fillRect(obs.x + 4, obs.y + 6 + row * 10, 4, 3);
+            ctx.fillStyle = "#22d3ee";
+            ctx.fillRect(obs.x + 10, obs.y + 6 + row * 10, 8, 3);
+          }
+        } else if (obs.type === "tang") {
+          // Steel crimper head details
+          ctx.strokeStyle = "#e2e8f0";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(obs.x + obs.width / 2, obs.y);
+          ctx.lineTo(obs.x + obs.width / 2, obs.y + 10);
+          ctx.stroke();
+        } else if (obs.type === "ip_conflict") {
+          // Flash hazard borders
+          if (Date.now() % 400 > 200) {
+            ctx.strokeStyle = "#ffffff";
+            ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+          }
+        }
+      });
+
+      // Draw player (TKJ Technician)
+      const currentHeight = isDucking ? playerHeight / 2 : playerHeight;
+      const legOffset = Math.floor(runFrame) % 2;
+
+      // Outer glow for player
+      ctx.shadowColor = "#34d399";
+      ctx.shadowBlur = 4;
+
+      // 1. Shirt & Body
+      ctx.fillStyle = "#059669"; // Green Wear pack
+      ctx.fillRect(playerX, playerY + 12, playerWidth, currentHeight - 20);
+
+      // 2. Yellow Helmet/Hard hat
+      ctx.fillStyle = "#fbbf24";
+      ctx.beginPath();
+      ctx.arc(playerX + playerWidth / 2, playerY + 6, 8, Math.PI, 0);
+      ctx.fill();
+      // Helmet visor rim
+      ctx.fillRect(playerX + playerWidth / 2 - 10, playerY + 5, 20, 2);
+
+      // 3. Face / Head
+      ctx.fillStyle = "#fbcfe8"; // Pink skin tone
+      ctx.fillRect(playerX + playerWidth / 2 - 6, playerY + 6, 12, 7);
+
+      // Goggles
+      ctx.fillStyle = "#22d3ee"; // Cyber visors
+      ctx.fillRect(playerX + playerWidth / 2 - 5, playerY + 7, 10, 3);
+
+      // Reset shadows
+      ctx.shadowBlur = 0;
+
+      // 4. Running Legs or Ducking crouch representation
+      ctx.fillStyle = "#064e3b"; // Darker pants
+      if (isJumping) {
+        // Draw legs tucked up
+        ctx.fillRect(playerX + 3, playerY + currentHeight - 8, 6, 5);
+        ctx.fillRect(playerX + playerWidth - 9, playerY + currentHeight - 8, 6, 5);
+      } else if (isDucking) {
+        // Crouched slide feet
+        ctx.fillRect(playerX + 2, playerY + currentHeight - 4, 8, 4);
+        ctx.fillRect(playerX + playerWidth - 10, playerY + currentHeight - 4, 8, 4);
+      } else {
+        // Alternate legs back and forth
+        if (legOffset === 0) {
+          ctx.fillRect(playerX + 3, playerY + currentHeight - 8, 5, 8); // Leg 1 down
+          ctx.fillRect(playerX + playerWidth - 8, playerY + currentHeight - 5, 5, 5); // Leg 2 up
+        } else {
+          ctx.fillRect(playerX + 3, playerY + currentHeight - 5, 5, 5); // Leg 1 up
+          ctx.fillRect(playerX + playerWidth - 8, playerY + currentHeight - 8, 5, 8); // Leg 2 down
+        }
+      }
+
+      // 5. Holding an Ethernet RJ45 Cable
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(playerX + playerWidth, playerY + currentHeight - 14);
+      ctx.quadraticCurveTo(playerX + playerWidth + 8, playerY + currentHeight - 8, playerX + playerWidth + 5, playerY + currentHeight - 4);
+      ctx.stroke();
+
+      // Connector plug head
+      ctx.fillStyle = "#f1f5f9";
+      ctx.fillRect(playerX + playerWidth + 3, playerY + currentHeight - 5, 4, 5);
+
+      // Draw Particles
+      particles.forEach(pt => {
+        ctx.fillStyle = pt.color;
+        ctx.globalAlpha = pt.alpha;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+    }
+
+    function gameLoop() {
+      if (!gameActive) return;
+      update();
+      draw();
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function setupInput() {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "ArrowUp" || e.key === " " || e.key === "w" || e.key === "W") {
+          keys["ArrowUp"] = true;
+          // Prevent browser space/arrow scrolling
+          e.preventDefault();
+        }
+        if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+          keys["ArrowDown"] = true;
+          e.preventDefault();
+        }
+      };
+
+      const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.key === "ArrowUp" || e.key === " " || e.key === "w" || e.key === "W") {
+          keys["ArrowUp"] = false;
+        }
+        if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+          keys["ArrowDown"] = false;
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keyup", handleKeyUp);
+
+      // Mobile touch screen helper binds
+      const btnJump = document.getElementById("btnDinoJump");
+      const btnDuck = document.getElementById("btnDinoDuck");
+
+      const jumpStart = () => { keys["ArrowUp"] = true; };
+      const jumpEnd = () => { keys["ArrowUp"] = false; };
+      const duckStart = () => { keys["ArrowDown"] = true; };
+      const duckEnd = () => { keys["ArrowDown"] = false; };
+
+      btnJump?.addEventListener("mousedown", jumpStart);
+      btnJump?.addEventListener("mouseup", jumpEnd);
+      btnJump?.addEventListener("mouseleave", jumpEnd);
+      btnJump?.addEventListener("touchstart", (e) => { e.preventDefault(); jumpStart(); });
+      btnJump?.addEventListener("touchend", jumpEnd);
+
+      btnDuck?.addEventListener("mousedown", duckStart);
+      btnDuck?.addEventListener("mouseup", duckEnd);
+      btnDuck?.addEventListener("mouseleave", duckEnd);
+      btnDuck?.addEventListener("touchstart", (e) => { e.preventDefault(); duckStart(); });
+      btnDuck?.addEventListener("touchend", duckEnd);
+
+      // Tap canvas directly to Jump
+      canvas.addEventListener("click", () => {
+        if (gameActive && !isJumping && !isDucking) {
+          playerVy = jumpForce;
+          isJumping = true;
+          playRetroSound("tick");
+        }
+      });
+
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("keyup", handleKeyUp);
+      };
+    }
+
+    const inputCleanup = setupInput();
+
+    async function handleGameOver() {
+      gameActive = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      inputCleanup();
+
+      const earnedXp = Math.min(60, (score * 0.08) + 8);
+      const earnedCoins = Math.min(40, (score * 0.04) + 4);
+
+      p.innerHTML = `
+        <div class="space-y-6 max-w-md mx-auto text-center font-sans animate-fadeIn">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-emerald-500/10">
+            <i data-lucide="wifi-off" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-xl font-bold text-white">Sambungan RJ45 Terputus!</h2>
+            <p class="text-xs text-slate-400">Kamu berhasil menempuh rintangan kabel sejauh ini untuk menyambungkan server kelas!</p>
+          </div>
+
+          <div class="p-6 bg-slate-950/50 rounded-3xl border border-slate-850 space-y-4">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Jarak Sambungan (Score):</span>
+              <span class="font-mono font-bold text-emerald-400 text-lg">${score} Meter</span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">High Score Bersejarah:</span>
+              <span class="font-mono font-bold text-yellow-400">${highscore} Meter</span>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 flex justify-around text-center">
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">XP DIDAPAT</span>
+                <span class="text-base font-bold text-emerald-400">+${Math.floor(earnedXp)} XP</span>
+              </div>
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">KOIN EMAS</span>
+                <span class="text-base font-bold text-yellow-400">+${Math.floor(earnedCoins)} Koin</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="exitDinoBtn" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-[1.01] cursor-pointer shadow-lg shadow-emerald-500/10">
+            KLAIM REWARD & KELUAR
+          </button>
+        </div>
+      `;
+      renderIcons();
+
+      document.getElementById("exitDinoBtn")?.addEventListener("click", async () => {
+        playRetroSound("click");
+        p.innerHTML = `
+          <div class="flex items-center justify-center py-12">
+            <div class="spinner"></div>
+            <span class="ml-3 text-slate-400">Menyimpan skor...</span>
+          </div>
+        `;
+        if (score > 0) {
+          await addRewards(Math.floor(earnedXp), Math.floor(earnedCoins), `Offline RJ45 Runner (${score} Meter)`);
+        }
+        activeGame = null;
+        loadGameProfile();
+      });
+    }
+
+    document.getElementById("startDinoBtn")?.addEventListener("click", () => {
+      if (startOverlay) startOverlay.style.display = "none";
+      playRetroSound("success");
+      resetGame();
+      gameActive = true;
       gameLoop();
     });
   }

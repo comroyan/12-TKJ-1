@@ -554,11 +554,29 @@ export function sendLocalSystemNotification(title: string, body: string) {
     try {
       const options = {
         body,
-        icon: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=128&h=128&fit=crop",
-        badge: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=128&h=128&fit=crop",
-        vibrate: [200, 100, 200]
+        icon: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=192&h=192&fit=crop",
+        badge: "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=96&h=96&fit=crop",
+        vibrate: [200, 100, 200],
+        tag: "classhub-notif",
+        renotify: true
       };
-      new Notification(title, options);
+
+      // Check if service worker is registered and ready for full mobile support
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+        }).catch((err) => {
+          console.warn("Service worker failed showing notification, using fallback:", err);
+          try {
+            new Notification(title, options);
+          } catch (fallbackErr) {
+            console.error("Fallback notification failed:", fallbackErr);
+          }
+        });
+      } else {
+        // Fallback for standard desktop browsers
+        new Notification(title, options);
+      }
     } catch (e) {
       console.warn("Gagal menampilkan notifikasi sistem:", e);
     }

@@ -41,6 +41,7 @@ import { renderSaluran } from "./pages/saluran";
 let activeUserSession: UserSession | null = null;
 let currentActivePage = "dashboard";
 let globalUnsubscribeNotifications: (() => void) | null = null;
+let globalUnsubscribeGameData: (() => void) | null = null;
 
 // Theme Engine
 export function applyTheme() {
@@ -560,7 +561,12 @@ async function renderMainLayout() {
       <div class="md:hidden flex items-center justify-between px-6 py-4 glass border-b border-slate-850 z-50 w-full">
         <div class="flex items-center gap-3">
           <img src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=48&h=48&fit=crop" id="headerClassLogo" class="w-8 h-8 rounded-xl object-cover border border-slate-800">
-          <span class="text-sm font-bold font-display tracking-tight" id="headerClassName">XII TKJ 1</span>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold font-display tracking-tight" id="headerClassName">XII TKJ 1</span>
+            <div class="flex items-center gap-1 text-[10px] text-yellow-400 font-mono font-bold mt-0.5">
+              <i data-lucide="coins" class="w-3.5 h-3.5"></i> <span id="headerCoinsValueMobile">--</span> Koin
+            </div>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <button id="mobileThemeToggleBtn" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-900 border border-slate-850" title="Ubah Tema">
@@ -653,6 +659,30 @@ async function renderMainLayout() {
               </button>
             ` : ""}
           </nav>
+
+          <!-- Global Coin & Level Widget -->
+          <div class="pt-4 border-t border-slate-850 flex flex-col gap-2 font-sans">
+            <div class="glass p-3 rounded-2xl bg-slate-900/60 border border-slate-850 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-yellow-500/10 text-yellow-400 flex items-center justify-center border border-yellow-500/20">
+                  <i data-lucide="coins" class="w-4 h-4"></i>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[9px] text-slate-500 uppercase tracking-wider leading-none">Koin Emas</span>
+                  <span id="sidebarCoinsValue" class="text-xs font-bold text-yellow-400 font-mono mt-0.5">--</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 border-l border-slate-850 pl-2.5">
+                <div class="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                  <i data-lucide="award" class="w-4 h-4"></i>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[9px] text-slate-500 uppercase tracking-wider leading-none">Level & XP</span>
+                  <span id="sidebarXpValue" class="text-xs font-bold text-cyan-400 font-mono mt-0.5">Lv. --</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Quick Profile Logout Footer -->
@@ -693,7 +723,7 @@ async function renderMainLayout() {
   }
 
   let isInitialLoad = true;
-  const notificationsQuery = query(collection(db, "notifications"), orderBy("date", "desc"), limit(1));
+  const notificationsQuery = query(collection(db, "notifications"), orderBy("date", "desc"), limit(5));
   globalUnsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
     if (isInitialLoad) {
       isInitialLoad = false;
@@ -706,6 +736,34 @@ async function renderMainLayout() {
         sendLocalSystemNotification(notif.title || "Pengumuman Kelas 📢", notif.content || "");
       }
     });
+  });
+
+  // Setup real-time gameData listener
+  if (globalUnsubscribeGameData) {
+    globalUnsubscribeGameData();
+    globalUnsubscribeGameData = null;
+  }
+
+  const gameDataDocRef = doc(db, "gameData", activeUserSession.uid);
+  globalUnsubscribeGameData = onSnapshot(gameDataDocRef, (snapshot) => {
+    let coinsVal = 50;
+    let levelVal = 1;
+    let xpVal = 10;
+    
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      coinsVal = data.coins ?? 50;
+      levelVal = data.level ?? 1;
+      xpVal = data.xp ?? 10;
+    }
+    
+    const sidebarCoins = document.getElementById("sidebarCoinsValue");
+    const sidebarXp = document.getElementById("sidebarXpValue");
+    const mobileCoins = document.getElementById("headerCoinsValueMobile");
+    
+    if (sidebarCoins) sidebarCoins.textContent = `${coinsVal} Koin`;
+    if (sidebarXp) sidebarXp.textContent = `Lv. ${levelVal} (${xpVal} XP)`;
+    if (mobileCoins) mobileCoins.textContent = `${coinsVal}`;
   });
 
   // Setup dynamic page routing listener
@@ -848,6 +906,10 @@ async function renderMainLayout() {
       if (globalUnsubscribeNotifications) {
         globalUnsubscribeNotifications();
         globalUnsubscribeNotifications = null;
+      }
+      if (globalUnsubscribeGameData) {
+        globalUnsubscribeGameData();
+        globalUnsubscribeGameData = null;
       }
       await logoutUser();
       toast.success("Berhasil keluar dari portal.");

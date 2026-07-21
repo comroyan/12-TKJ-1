@@ -1,4 +1,4 @@
-import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask } from "../firebase/db";
+import { getTasks, getSubmissions, getMySubmissions, addSubmission, updateSubmissionFeedback, deleteSubmission, writeAuditLog, getStudentUsers, addTask, createNotification } from "../firebase/db";
 import { renderIcons, formatDate, toast, confirmDialog, getApiUrl, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -1169,7 +1169,13 @@ export async function renderSubmissions(container: HTMLElement, userSession: any
             try {
               await addTask(result.value);
               await writeAuditLog("Create Task", `Membuat Tugas Baru: [${result.value.subject}] ${result.value.title}`);
-              toast.success("Tugas berhasil ditambahkan ke kelas!");
+              
+              // Send real-time notification to class members
+              const notificationTitle = `Tugas Baru: ${result.value.subject}`;
+              const notificationContent = `Tugas "${result.value.title}" baru saja ditambahkan oleh ${userSession.name || "Guru/Wali Kelas"}. Deadline: ${formatDate(result.value.deadline)}.`;
+              await createNotification(notificationTitle, notificationContent, "warning");
+
+              toast.success("Tugas berhasil ditambahkan ke kelas & notifikasi terkirim!");
               loadAndRender();
             } catch (err: any) {
               Swal.fire("Gagal", err.message, "error");
