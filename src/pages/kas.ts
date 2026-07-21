@@ -17,6 +17,17 @@ import { formatRupiah, formatDate, renderIcons, toast, confirmDialog, exportToCS
 import Swal from "sweetalert2";
 
 export async function renderKas(container: HTMLElement, userSession: any) {
+  function isTeacher(user: any) {
+    const roleLower = (user.role || "").toLowerCase();
+    const jabLower = (user.jabatan || "").toLowerCase();
+    return roleLower === "wali kelas" || 
+           roleLower === "guru" || 
+           jabLower.includes("wali") || 
+           jabLower.includes("guru") || 
+           !user.absen || 
+           user.absen === 0;
+  }
+
   container.innerHTML = `
     <div class="flex items-center justify-center py-12">
       <div class="spinner"></div>
@@ -34,12 +45,14 @@ export async function renderKas(container: HTMLElement, userSession: any) {
   let studentSearchQuery = "";
 
   async function loadAndRender() {
-    const [funds, eventFunds, students, systemSettings] = await Promise.all([
+    const [funds, eventFunds, allUsers, systemSettings] = await Promise.all([
       getClassFunds(),
       getEventFunds(),
       getStudentUsers(),
       getSystemSettings()
     ]);
+
+    const students = allUsers.filter((s: any) => !isTeacher(s));
 
     if (systemSettings && systemSettings.weeklyIuranRate !== undefined) {
       weeklyIuranRate = systemSettings.weeklyIuranRate;

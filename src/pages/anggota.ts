@@ -30,7 +30,8 @@ export async function renderAnggota(container: HTMLElement, userSession: any) {
   `;
 
   async function loadAndRender() {
-    const students = await getStudentUsers();
+    const allUsers = await getStudentUsers();
+    const students = allUsers.filter(s => !isTeacher(s));
     const isSAdmin = userSession.role === "Super Admin";
 
     container.innerHTML = `
@@ -649,9 +650,6 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
                     <option value="Bendahara">Siswa (Bendahara)</option>
                     <option value="Sekretaris">Siswa (Sekretaris)</option>
                     <option value="Wakil">Siswa (Wakil)</option>
-                    <option value="Wali Kelas">Wali Kelas</option>
-                    <option value="Guru">Guru</option>
-                    <option value="Super Admin">Super Admin</option>
                   </select>
                 </div>
               </div>
@@ -686,29 +684,11 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
 
             const updateFields = () => {
               const val = mRole.value;
-              const isTeacherOrAdmin = val === "Guru" || val === "Wali Kelas" || val === "Super Admin";
-              if (isTeacherOrAdmin) {
-                mAbsen.value = "";
-                mAbsen.disabled = true;
-                mAbsen.classList.add("opacity-50");
-                labelAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
-                if (val === "Guru") {
-                  mJabatan.value = "Guru Mata Pelajaran";
-                  mPassword.value = "Guru@TKJ1_2026";
-                } else if (val === "Wali Kelas") {
-                  mJabatan.value = "Wali Kelas XII TKJ 1";
-                  mPassword.value = "WaliKelas@TKJ1_2026";
-                } else {
-                  mJabatan.value = "Super Admin";
-                  mPassword.value = "Admin@TKJ1_2026";
-                }
-              } else {
-                mAbsen.disabled = false;
-                mAbsen.classList.remove("opacity-50");
-                labelAbsen.innerHTML = `Nomor Absen`;
-                mJabatan.value = val === "Anggota" ? "Siswa" : val;
-                mPassword.value = "Siswa@TKJ1_2026";
-              }
+              mAbsen.disabled = false;
+              mAbsen.classList.remove("opacity-50");
+              labelAbsen.innerHTML = `Nomor Absen`;
+              mJabatan.value = val === "Anggota" ? "Siswa" : val;
+              mPassword.value = "Siswa@TKJ1_2026";
             };
 
             mRole.addEventListener("change", updateFields);
@@ -717,18 +697,18 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
           preConfirm: () => {
             const name = (document.getElementById("mName") as HTMLInputElement).value.trim();
             const absen = (document.getElementById("mAbsen") as HTMLInputElement).value.trim();
-            const email = (document.getElementById("mEmail") as HTMLInputElement).value.trim();
+            const emailInput = (document.getElementById("mEmail") as HTMLInputElement).value.trim();
             const password = (document.getElementById("mPassword") as HTMLInputElement).value.trim();
             const role = (document.getElementById("mRole") as HTMLSelectElement).value;
             const jabatan = (document.getElementById("mJabatan") as HTMLInputElement).value.trim();
 
-            const isTeacherOrAdmin = role === "Guru" || role === "Wali Kelas" || role === "Super Admin";
-
-            if (!name || (!isTeacherOrAdmin && !absen) || !email || !password) {
+            if (!name || !absen || !emailInput || !password) {
               Swal.showValidationMessage("Harap isi semua kolom wajib!");
               return false;
             }
-            return { name, absen: isTeacherOrAdmin ? "0" : absen, email, password, role, jabatan };
+
+            const email = emailInput.includes("@") ? emailInput : `${emailInput}@classhub.local`;
+            return { name, absen, email, password, role, jabatan };
           }
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -793,9 +773,6 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
                   <option value="Bendahara" ${student.role === 'Bendahara' ? 'selected' : ''}>Bendahara</option>
                   <option value="Sekretaris" ${student.role === 'Sekretaris' ? 'selected' : ''}>Sekretaris</option>
                   <option value="Wakil" ${student.role === 'Wakil' ? 'selected' : ''}>Wakil</option>
-                  <option value="Wali Kelas" ${student.role === 'Wali Kelas' ? 'selected' : ''}>Wali Kelas</option>
-                  <option value="Guru" ${student.role === 'Guru' ? 'selected' : ''}>Guru</option>
-                  <option value="Super Admin" ${student.role === 'Super Admin' ? 'selected' : ''}>Super Admin</option>
                 </select>
               </div>
               <div>
@@ -845,39 +822,16 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
         if (eRole && eAbsen && labelEditAbsen) {
           const updateFields = () => {
             const val = eRole.value;
-            const isTeacherOrAdmin = val === "Guru" || val === "Wali Kelas" || val === "Super Admin";
-            if (isTeacherOrAdmin) {
-              eAbsen.value = "";
-              eAbsen.disabled = true;
-              eAbsen.classList.add("opacity-50");
-              labelEditAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
-              if (eJabatan) {
-                if (val === "Guru" && (!eJabatan.value || eJabatan.value === "Siswa")) {
-                  eJabatan.value = "Guru Mata Pelajaran";
-                } else if (val === "Wali Kelas" && (!eJabatan.value || eJabatan.value === "Siswa")) {
-                  eJabatan.value = "Wali Kelas XII TKJ 1";
-                }
-              }
-            } else {
-              eAbsen.disabled = false;
-              eAbsen.classList.remove("opacity-50");
-              labelEditAbsen.innerHTML = `Nomor Absen`;
-              if (eJabatan && (eJabatan.value === "Guru Mata Pelajaran" || eJabatan.value === "Wali Kelas XII TKJ 1" || eJabatan.value === "Super Admin")) {
-                eJabatan.value = val === "Anggota" ? "Siswa" : val;
-              }
+            eAbsen.disabled = false;
+            eAbsen.classList.remove("opacity-50");
+            labelEditAbsen.innerHTML = `Nomor Absen`;
+            if (eJabatan) {
+              eJabatan.value = val === "Anggota" ? "Siswa" : val;
             }
           };
 
           eRole.addEventListener("change", updateFields);
           updateFields();
-        } else if (eAbsen && labelEditAbsen) {
-          const isTeacherOrAdmin = student.role === "Guru" || student.role === "Wali Kelas" || student.role === "Super Admin";
-          if (isTeacherOrAdmin) {
-            eAbsen.value = "";
-            eAbsen.disabled = true;
-            eAbsen.classList.add("opacity-50");
-            labelEditAbsen.innerHTML = `Nomor Absen <span class="text-[10px] text-slate-500 font-normal">(Tidak wajib)</span>`;
-          }
         }
       },
       preConfirm: () => {
@@ -895,11 +849,10 @@ ${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
           updateData.role = (document.getElementById("eRole") as HTMLSelectElement).value;
           updateData.status = (document.getElementById("eStatus") as HTMLSelectElement).value;
 
-          const isTeacherOrAdmin = updateData.role === "Guru" || updateData.role === "Wali Kelas" || updateData.role === "Super Admin";
           const eAbsenVal = (document.getElementById("eAbsen") as HTMLInputElement).value.trim();
-          updateData.absen = isTeacherOrAdmin ? 0 : parseInt(eAbsenVal);
+          updateData.absen = parseInt(eAbsenVal);
 
-          if (!updateData.name || (!isTeacherOrAdmin && isNaN(updateData.absen))) {
+          if (!updateData.name || isNaN(updateData.absen)) {
             Swal.showValidationMessage("Nama dan Absen harus valid!");
             return false;
           }

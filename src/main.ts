@@ -17,6 +17,7 @@ import { createStudentUser } from "./firebase/db";
 // Import Page Renderers
 import { renderDashboard } from "./pages/dashboard";
 import { renderAnggota } from "./pages/anggota";
+import { renderGuru } from "./pages/guru";
 import { renderJadwal } from "./pages/jadwal";
 import { renderKas } from "./pages/kas";
 import { renderTugas } from "./pages/tugas";
@@ -592,6 +593,9 @@ async function renderMainLayout() {
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="anggota">
               <i data-lucide="users" class="w-4 h-4"></i> Anggota Kelas
             </button>
+            <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="guru">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Guru & Staf
+            </button>
             <button class="nav-item w-full flex items-center gap-3 p-2.5 rounded-lg text-xs font-medium border-l-3 border-l-transparent text-slate-400 hover:bg-sky-500/10 hover:text-sky-400 transition-all" data-page="jadwal">
               <i data-lucide="calendar" class="w-4 h-4"></i> Jadwal & Piket
             </button>
@@ -737,6 +741,9 @@ async function renderMainLayout() {
         break;
       case "anggota":
         renderAnggota(pageContent, activeUserSession);
+        break;
+      case "guru":
+        renderGuru(pageContent, activeUserSession);
         break;
       case "jadwal":
         renderJadwal(pageContent, activeUserSession);
