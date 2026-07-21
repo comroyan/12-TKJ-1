@@ -1,5 +1,5 @@
-import { getTasks, addTask, updateTaskStatus, deleteTask, getAgendas, addAgendaItem, deleteAgendaItem } from "../firebase/db";
-import { renderIcons, formatDate, toast, confirmDialog } from "../utils/helpers";
+import { getTasks, addTask, updateTaskStatus, deleteTask, getAgendas, addAgendaItem, deleteAgendaItem, getMySubmissions } from "../firebase/db";
+import { renderIcons, formatDate, toast, confirmDialog, openSubmitTaskModal } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 export async function renderTugas(container: HTMLElement, userSession: any) {
@@ -11,9 +11,10 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
   `;
 
   async function loadAndRender() {
-    const [tasks, agendas] = await Promise.all([
+    const [tasks, agendas, mySubmissions] = await Promise.all([
       getTasks(),
-      getAgendas()
+      getAgendas(),
+      getMySubmissions(userSession.uid)
     ]);
 
     const isEditor = userSession.role === "Super Admin" || 
@@ -71,6 +72,28 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
                 ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Kelompok</span>`
                 : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> Individu</span>`;
 
+              // Check if currently logged in student has submitted for this task
+              const submission = mySubmissions.find((s: any) => s.taskId === t.id);
+              let submissionBadge = "";
+              if (submission) {
+                const isApproved = submission.status === "Disetujui" || submission.status === "Selesai" || submission.status === "Lunas";
+                const isPending = submission.status === "Menunggu Pemeriksaan" || !submission.status;
+                const statusColor = isApproved ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : isPending ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                submissionBadge = `
+                  <div class="mt-3 p-2.5 rounded-xl bg-slate-900/60 border border-slate-850 flex items-center justify-between gap-2">
+                    <div class="overflow-hidden">
+                      <span class="text-[9px] text-slate-500 uppercase block font-semibold">Tugas Anda</span>
+                      <a href="${submission.fileUrl}" target="_blank" class="text-xs text-cyan-400 hover:underline font-medium truncate block flex items-center gap-1">
+                        <i data-lucide="paperclip" class="w-3 h-3"></i> ${submission.fileName || 'Lihat Berkas'}
+                      </a>
+                    </div>
+                    <span class="text-[9px] font-bold px-2 py-0.5 rounded ${statusColor}">
+                      ${submission.status || 'Menunggu'}
+                    </span>
+                  </div>
+                `;
+              }
+
               return `
                 <div class="glass rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between glass-card-hover border-t-4 ${t.status === 'completed' ? 'border-t-emerald-500' : isOverdue ? 'border-t-rose-600' : 'border-t-yellow-500'}">
                   <div>
@@ -94,33 +117,44 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
                       </div>
                       ${isOverdue ? `<span class="text-[10px] font-bold text-rose-500 flex items-center gap-1 mt-1"><i data-lucide="shield-alert" class="w-3 h-3"></i> TUGAS TERLEWAT DEADLINE</span>` : ""}
                     </div>
+
+                    ${submissionBadge}
                   </div>
 
-                  <div class="mt-6 pt-4 border-t border-slate-850 flex items-center justify-between">
-                    <div>
-                      <span class="text-[10px] uppercase text-slate-500 font-semibold block">Status Tugas</span>
-                      <span class="text-xs font-bold ${t.status === 'completed' ? 'text-emerald-400' : 'text-yellow-400'} flex items-center gap-1 mt-0.5">
-                        <span class="w-1.5 h-1.5 rounded-full ${t.status === 'completed' ? 'bg-emerald-400' : 'bg-yellow-400 animate-ping'}"></span>
-                        ${t.status === 'completed' ? 'Selesai' : 'Pending'}
-                      </span>
+                  <div class="mt-6 pt-4 border-t border-slate-850 flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[10px] uppercase text-slate-500 font-semibold block">Status Tugas</span>
+                        <span class="text-xs font-bold ${t.status === 'completed' ? 'text-emerald-400' : 'text-yellow-400'} flex items-center gap-1 mt-0.5">
+                          <span class="w-1.5 h-1.5 rounded-full ${t.status === 'completed' ? 'bg-emerald-400' : 'bg-yellow-400 animate-ping'}"></span>
+                          ${t.status === 'completed' ? 'Selesai' : 'Pending'}
+                        </span>
+                      </div>
+
+                      <div class="flex items-center gap-1">
+                        ${isEditor ? (t.status === 'pending' ? `
+                          <button class="completeTaskBtn px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
+                            ✓ Selesai
+                          </button>
+                        ` : `
+                          <button class="pendingTaskBtn px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
+                            Unmark
+                          </button>
+                        `) : ""}
+                        ${isEditor ? `
+                          <button class="deleteTaskBtn p-2 bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 rounded-xl transition-colors" data-id="${t.id}">
+                            <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
+                          </button>
+                        ` : ""}
+                      </div>
                     </div>
 
-                    <div class="flex items-center gap-1">
-                      ${isEditor ? (t.status === 'pending' ? `
-                        <button class="completeTaskBtn px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
-                          ✓ Selesai
-                        </button>
-                      ` : `
-                        <button class="pendingTaskBtn px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-all" data-id="${t.id}">
-                          Unmark
-                        </button>
-                      `) : ""}
-                      ${isEditor ? `
-                        <button class="deleteTaskBtn p-2 bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-500 hover:text-slate-950 rounded-xl transition-colors" data-id="${t.id}">
-                          <i data-lucide="trash2" class="w-3.5 h-3.5"></i>
-                        </button>
-                      ` : ""}
-                    </div>
+                    ${(!submission && t.status === "pending") ? `
+                      <button class="modalSubmitTaskBtn w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5" 
+                              data-id="${t.id}" data-title="${t.title.replace(/"/g, '&quot;')}" data-subject="${t.subject.replace(/"/g, '&quot;')}" data-type="${t.type || 'Individu'}">
+                        <i data-lucide="file-up" class="w-3.5 h-3.5"></i> Kumpulkan Tugas
+                      </button>
+                    ` : ""}
                   </div>
                 </div>
               `;
@@ -243,6 +277,20 @@ export async function renderTugas(container: HTMLElement, userSession: any) {
             Swal.fire("Error", e.message, "error");
           }
         }
+      });
+    });
+
+    document.querySelectorAll(".modalSubmitTaskBtn").forEach((btn: any) => {
+      btn.addEventListener("click", async () => {
+        const taskObj = {
+          id: btn.dataset.id,
+          title: btn.dataset.title,
+          subject: btn.dataset.subject,
+          type: btn.dataset.type
+        };
+        await openSubmitTaskModal(taskObj, userSession, () => {
+          loadAndRender();
+        });
       });
     });
 

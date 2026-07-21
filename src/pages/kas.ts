@@ -58,7 +58,7 @@ export async function renderKas(container: HTMLElement, userSession: any) {
       weeklyIuranRate = systemSettings.weeklyIuranRate;
     }
 
-    const isTreasurer = userSession.role === "Super Admin" || userSession.role === "Bendahara";
+    const isTreasurer = userSession.role === "Super Admin" || userSession.role === "Bendahara" || isTeacher(userSession);
 
     // Regular Class Fund math (approved/confirmed transactions only)
     const approvedFunds = funds.filter((f: any) => f.status === "approved" || !f.status);

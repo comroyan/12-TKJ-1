@@ -44,6 +44,7 @@ import {
   Camera
 } from "lucide";
 import Swal from "sweetalert2";
+import { addSubmission } from "../firebase/db";
 
 // Currency Formatter
 export function formatRupiah(amount: number): string {
@@ -609,6 +610,242 @@ export async function requestNotificationPermission(): Promise<boolean> {
   } catch (err: any) {
     console.error("Gagal meminta izin notifikasi:", err);
     return false;
+  }
+}
+
+export async function openSubmitTaskModal(task: any, userSession: any, onSuccess: () => void) {
+  const isKelompok = task.type === "Kelompok";
+  let selectedFile: File | null = null;
+  let members: { name: string; absen: number }[] = [
+    { name: userSession.name, absen: userSession.absen || 0 }
+  ];
+
+  const { value: formValues } = await Swal.fire({
+    title: "Kumpulkan Tugas",
+    background: "#0f172a",
+    color: "#f8fafc",
+    confirmButtonColor: "#06b6d4",
+    cancelButtonColor: "#334155",
+    confirmButtonText: "Kirim Tugas",
+    cancelButtonText: "Batal",
+    showCancelButton: true,
+    html: `
+      <div class="space-y-4 text-left font-sans mt-2">
+        <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <span class="text-[10px] font-mono text-cyan-400 block uppercase">Mata Pelajaran</span>
+          <span class="text-xs font-semibold text-slate-300 block">${task.subject}</span>
+          <span class="text-sm font-bold text-white block mt-1">${task.title}</span>
+        </div>
+
+        ${isKelompok ? `
+          <div>
+            <label class="block text-xs text-slate-400 font-semibold mb-1.5">Anggota Kelompok</label>
+            <div id="modal-members-list" class="space-y-2 mb-2">
+              <div class="flex items-center gap-2 p-2 bg-slate-900 rounded-xl border border-slate-800">
+                <span class="text-xs font-bold text-white flex-1">${userSession.name} (Absen ${userSession.absen || 0})</span>
+                <span class="text-[9px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">Ketua</span>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" id="modal-member-name" placeholder="Nama Anggota Baru" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-cyan-500">
+              <input type="number" id="modal-member-absen" placeholder="Absen" class="w-20 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-cyan-500">
+              <button type="button" id="modal-add-member-btn" class="px-3 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl transition-colors">Tambah</button>
+            </div>
+          </div>
+        ` : ""}
+
+        <div>
+          <label class="block text-xs text-slate-400 font-semibold mb-1.5">Upload File Lampiran</label>
+          <div id="modal-dropzone" class="border-2 border-dashed border-slate-800 hover:border-cyan-500/50 bg-slate-950/50 rounded-2xl p-6 text-center cursor-pointer transition-all relative group">
+            <input type="file" id="modal-file-input" class="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.pkt,.pkz">
+            <div id="modal-dropzone-content" class="space-y-2">
+              <div class="inline-flex p-3 bg-cyan-500/10 text-cyan-400 rounded-xl group-hover:scale-115 transition-transform">
+                <i data-lucide="cloud-lightning" class="w-5 h-5"></i>
+              </div>
+              <p class="text-xs font-semibold text-slate-300">Tarik berkas ke sini atau <span class="text-cyan-400 underline">pilih dari folder</span></p>
+              <p class="text-[9px] text-slate-500 font-mono">ZIP, RAR, PDF, DOCX, PNG, PKT (Maks. 50MB)</p>
+            </div>
+            <div id="modal-selected-file" class="hidden flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-left">
+              <div class="flex items-center gap-3 overflow-hidden">
+                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                  <i data-lucide="file-text" class="w-4 h-4"></i>
+                </div>
+                <div class="overflow-hidden">
+                  <p id="modal-filename" class="text-xs font-bold text-white truncate"></p>
+                  <p id="modal-filesize" class="text-[9px] text-slate-500 font-mono"></p>
+                </div>
+              </div>
+              <button type="button" id="modal-remove-file-btn" class="p-1.5 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-lg transition-colors">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="modal-progress-container" class="hidden space-y-1.5 p-3.5 bg-slate-900 rounded-2xl border border-slate-800">
+          <div class="flex justify-between text-[10px] font-bold font-mono">
+            <span class="text-slate-400" id="modal-progress-status">Mengunggah ke server...</span>
+            <span class="text-cyan-400" id="modal-progress-pct">0%</span>
+          </div>
+          <div class="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800/50">
+            <div id="modal-progress-bar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    `,
+    didOpen: () => {
+      const dropzone = document.getElementById("modal-dropzone") as HTMLDivElement;
+      const fileInput = document.getElementById("modal-file-input") as HTMLInputElement;
+      const dropzoneContent = document.getElementById("modal-dropzone-content") as HTMLDivElement;
+      const selectedFileState = document.getElementById("modal-selected-file") as HTMLDivElement;
+      const filenameEl = document.getElementById("modal-filename") as HTMLParagraphElement;
+      const filesizeEl = document.getElementById("modal-filesize") as HTMLParagraphElement;
+      const removeBtn = document.getElementById("modal-remove-file-btn") as HTMLButtonElement;
+
+      function handleFile(file: File) {
+        if (file.size > 50 * 1024 * 1024) {
+          Swal.showValidationMessage("Ukuran berkas maksimal 50MB!");
+          return;
+        }
+        selectedFile = file;
+        filenameEl.textContent = file.name;
+        filesizeEl.textContent = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+        
+        dropzoneContent.classList.add("hidden");
+        selectedFileState.classList.remove("hidden");
+      }
+
+      dropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files && fileInput.files[0]) {
+          handleFile(fileInput.files[0]);
+        }
+      });
+
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("border-cyan-500", "bg-cyan-950/10");
+      });
+
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("border-cyan-500", "bg-cyan-950/10");
+      });
+
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("border-cyan-500", "bg-cyan-950/10");
+        if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      removeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectedFile = null;
+        fileInput.value = "";
+        selectedFileState.classList.add("hidden");
+        dropzoneContent.classList.remove("hidden");
+      });
+
+      if (isKelompok) {
+        const membersList = document.getElementById("modal-members-list") as HTMLDivElement;
+        const addMemberBtn = document.getElementById("modal-add-member-btn") as HTMLButtonElement;
+        const memberNameInput = document.getElementById("modal-member-name") as HTMLInputElement;
+        const memberAbsenInput = document.getElementById("modal-member-absen") as HTMLInputElement;
+
+        addMemberBtn.addEventListener("click", () => {
+          const name = memberNameInput.value.trim();
+          const absenVal = memberAbsenInput.value.trim();
+          const absen = parseInt(absenVal || "0", 10);
+
+          if (!name) {
+            Swal.showValidationMessage("Nama anggota tidak boleh kosong!");
+            return;
+          }
+
+          members.push({ name, absen });
+
+          const row = document.createElement("div");
+          row.className = "flex items-center gap-2 p-2 bg-slate-900 rounded-xl border border-slate-800 animate-fadeIn";
+          row.innerHTML = `
+            <span class="text-xs font-bold text-white flex-1">${name} (Absen ${absen})</span>
+            <button type="button" class="modal-remove-member-btn p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-lg transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+              </svg>
+            </button>
+          `;
+
+          row.querySelector(".modal-remove-member-btn")?.addEventListener("click", () => {
+            members = members.filter(m => m.name !== name);
+            row.remove();
+          });
+
+          membersList.appendChild(row);
+          memberNameInput.value = "";
+          memberAbsenInput.value = "";
+        });
+      }
+    },
+    preConfirm: async () => {
+      if (!selectedFile) {
+        Swal.showValidationMessage("Silakan pilih file tugas terlebih dahulu!");
+        return false;
+      }
+
+      const progressContainer = document.getElementById("modal-progress-container") as HTMLDivElement;
+      const progressBar = document.getElementById("modal-progress-bar") as HTMLDivElement;
+      const progressStatus = document.getElementById("modal-progress-status") as HTMLSpanElement;
+      const progressPct = document.getElementById("modal-progress-pct") as HTMLSpanElement;
+
+      progressContainer.classList.remove("hidden");
+
+      try {
+        progressStatus.textContent = "Mengunggah berkas...";
+        const uploadResult = await uploadFileToServer(selectedFile, (pct) => {
+          progressBar.style.width = pct + "%";
+          progressPct.textContent = pct + "%";
+        });
+
+        if (!uploadResult || !uploadResult.fileUrl) {
+          throw new Error("Gagal mengunggah berkas");
+        }
+
+        progressStatus.textContent = "Menyimpan ke database...";
+        const payload = {
+          taskId: task.id,
+          taskTitle: task.title,
+          subject: task.subject,
+          userId: userSession.uid,
+          userName: userSession.name,
+          absen: userSession.absen || 0,
+          fileName: selectedFile.name,
+          fileUrl: uploadResult.fileUrl,
+          status: "Menunggu Pemeriksaan",
+          feedback: "",
+          taskType: task.type || "Individu",
+          members: members
+        };
+
+        await addSubmission(payload);
+        return true;
+      } catch (err: any) {
+        Swal.showValidationMessage("Error: " + err.message);
+        return false;
+      }
+    }
+  });
+
+  if (formValues) {
+    Swal.fire({
+      icon: "success",
+      title: "Tugas Terkumpul!",
+      text: "Tugas Anda berhasil diunggah ke server ClassHub.",
+      background: "#0f172a",
+      color: "#f8fafc",
+      confirmButtonColor: "#06b6d4"
+    });
+    onSuccess();
   }
 }
 

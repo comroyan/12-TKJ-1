@@ -6,9 +6,12 @@ import {
   getSchedules, 
   getPickets,
   getCountdownSettings,
-  saveCountdownSettings
+  saveCountdownSettings,
+  getSystemSettings,
+  getMySubmissions,
+  addClassFundEntry
 } from "../firebase/db";
-import { formatRupiah, renderIcons, isOddWeek, toast, requestNotificationPermission } from "../utils/helpers";
+import { formatRupiah, renderIcons, isOddWeek, toast, requestNotificationPermission, openSubmitTaskModal, uploadFileToServer } from "../utils/helpers";
 import Swal from "sweetalert2";
 
 function isTeacher(user: any) {
@@ -41,14 +44,16 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   `;
 
   // Fetch all dashboard relevant data in parallel including customizable countdown targets
-  const [allUsers, funds, tasks, agendas, schedules, pickets, countdownSettings] = await Promise.all([
+  const [allUsers, funds, tasks, agendas, schedules, pickets, countdownSettings, systemSettings, mySubmissions] = await Promise.all([
     getStudentUsers(),
     getClassFunds(),
     getTasks(),
     getAgendas(),
     getSchedules(),
     getPickets(),
-    getCountdownSettings()
+    getCountdownSettings(),
+    getSystemSettings(),
+    getMySubmissions(userSession.uid)
   ]);
 
   const students = allUsers.filter((u: any) => !isTeacher(u));
@@ -85,6 +90,73 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
   // Filter tasks and agendas
   const pendingTasksCount = tasks.filter((t: any) => t.status === "pending").length;
   const upcomingEvents = agendas.filter((a: any) => new Date(a.date) >= new Date()).slice(0, 3);
+
+  // 1. Calculate Active Student's Cash Ledger Bill
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+  
+  const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const weeksOfCurrentMonth: { weekNum: number; label: string; startDay: number; endDay: number }[] = [];
+  const weekRanges = [
+    { num: 1, start: 1, end: 7 },
+    { num: 2, start: 8, end: 14 },
+    { num: 3, start: 15, end: 21 },
+    { num: 4, start: 22, end: 28 },
+    { num: 5, start: 29, end: 31 }
+  ];
+  weekRanges.forEach(r => {
+    if (r.start <= totalDaysInMonth) {
+      weeksOfCurrentMonth.push({
+        weekNum: r.num,
+        label: `Minggu ${r.num}`,
+        startDay: r.start,
+        endDay: Math.min(r.end, totalDaysInMonth)
+      });
+    }
+  });
+
+  const currentWeekObj = weeksOfCurrentMonth.find(w => currentDay >= w.startDay && currentDay <= w.endDay) || weeksOfCurrentMonth[0];
+  const currentWeekNum = currentWeekObj ? currentWeekObj.weekNum : 1;
+  const pastAndCurrentWeeks = weeksOfCurrentMonth.filter(w => w.weekNum <= currentWeekNum);
+
+  let unpaidWeeksCount = 0;
+  const unpaidWeeksLabels: string[] = [];
+  const studentFundsThisMonth = approvedFunds.filter((f: any) => {
+    if (f.userId !== userSession.uid || f.type !== "in") return false;
+    const entryDate = f.date.toDate ? f.date.toDate() : new Date(f.date);
+    return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+  });
+
+  pastAndCurrentWeeks.forEach(w => {
+    const hasPaid = studentFundsThisMonth.some((f: any) => {
+      const entryDate = f.date.toDate ? f.date.toDate() : new Date(f.date);
+      const day = entryDate.getDate();
+      return day >= w.startDay && day <= w.endDay;
+    });
+    if (!hasPaid) {
+      unpaidWeeksCount++;
+      unpaidWeeksLabels.push(w.label);
+    }
+  });
+
+  const weeklyIuranRate = (systemSettings && systemSettings.weeklyIuranRate !== undefined) ? systemSettings.weeklyIuranRate : 5000;
+  const myBillAmount = unpaidWeeksCount * weeklyIuranRate;
+
+  // 2. Filter Urgent Tasks (Tugas Mendesak)
+  const urgentTasks = tasks.filter((t: any) => {
+    if (t.status !== "pending") return false;
+    const hasSubmitted = mySubmissions.some((s: any) => s.taskId === t.id);
+    if (hasSubmitted) return false;
+
+    const deadlineDate = new Date(t.deadline);
+    const timeDiff = deadlineDate.getTime() - now.getTime();
+    const hoursRemaining = timeDiff / (1000 * 60 * 60);
+
+    // Urgent if approaching in <= 72 hours, or overdue
+    return hoursRemaining <= 72;
+  });
 
   // Motivational Quotes
   const quotes = [
@@ -219,6 +291,107 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
           <div>
             <span class="text-xs text-slate-400 block font-medium">Agenda Terdekat</span>
             <span class="text-2xl font-bold text-white block mt-0.5">${upcomingEvents.length} Kegiatan</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Info Mendesak & Tagihan Kas -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
+        <!-- Card Tagihan Kas Kelas -->
+        <div class="p-6 glass rounded-3xl relative overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-slate-950 via-slate-900/40 to-emerald-950/10 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold font-display tracking-wider text-emerald-400 uppercase flex items-center gap-2">
+                <i data-lucide="dollar-sign" class="w-4.5 h-4.5"></i> Ringkasan Kas Kelas Anda
+              </h3>
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg ${unpaidWeeksCount === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">
+                ${unpaidWeeksCount === 0 ? 'Lunas Bulan Ini' : 'Ada Tagihan'}
+              </span>
+            </div>
+
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-extrabold text-white font-mono">${formatRupiah(myBillAmount)}</span>
+              ${unpaidWeeksCount > 0 ? `
+                <span class="text-xs text-slate-400 font-medium">(${unpaidWeeksCount} minggu belum dibayar)</span>
+              ` : ""}
+            </div>
+
+            ${unpaidWeeksCount > 0 ? `
+              <p class="text-xs text-slate-400 mt-3 leading-relaxed">
+                Anda belum melakukan pembayaran iuran kas mingguan untuk: 
+                <strong class="text-amber-400">${unpaidWeeksLabels.join(", ")}</strong>. 
+                Silakan bayar ke Bendahara atau klik tombol di bawah untuk menyetorkan bukti transfer.
+              </p>
+            ` : `
+              <p class="text-xs text-slate-400 mt-3 leading-relaxed">
+                Hebat! Pembayaran iuran kas kelas Anda sepenuhnya lunas untuk bulan ini. Terima kasih atas partisipasi aktif Anda dalam mendukung kas XII TKJ 1!
+              </p>
+            `}
+          </div>
+
+          <div class="mt-6 flex gap-3">
+            <button id="quickPayKasBtn" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-1.5">
+              <i data-lucide="file-up" class="w-3.5 h-3.5"></i> Setor Bukti Bayar Kas
+            </button>
+          </div>
+        </div>
+
+        <!-- Card Tugas Mendesak -->
+        <div class="p-6 glass rounded-3xl relative overflow-hidden border border-rose-500/20 bg-gradient-to-br from-slate-950 via-slate-900/40 to-rose-950/10 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold font-display tracking-wider text-rose-400 uppercase flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-4.5 h-4.5"></i> Tugas Mendesak (${urgentTasks.length})
+              </h3>
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg ${urgentTasks.length === 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse'}">
+                ${urgentTasks.length === 0 ? 'Aman' : 'Segera Selesaikan'}
+              </span>
+            </div>
+
+            <div class="space-y-3">
+              ${urgentTasks.length > 0 ? urgentTasks.slice(0, 2).map((t: any) => {
+                const deadlineDate = new Date(t.deadline);
+                const isOverdue = deadlineDate < new Date();
+                const timeDiff = deadlineDate.getTime() - new Date().getTime();
+                const hoursRemaining = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60)));
+                const daysRemaining = Math.max(0, Math.floor(hoursRemaining / 24));
+                
+                let remainingLabel = "";
+                if (isOverdue) {
+                  remainingLabel = "Terlewat Deadline!";
+                } else if (daysRemaining > 0) {
+                  remainingLabel = `Sisa ${daysRemaining} hari`;
+                } else {
+                  remainingLabel = `Sisa ${hoursRemaining} jam`;
+                }
+
+                return `
+                  <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-850 flex items-center justify-between gap-4">
+                    <div class="overflow-hidden">
+                      <span class="text-[9px] text-slate-500 font-mono block uppercase">${t.subject}</span>
+                      <h4 class="text-xs font-bold text-white truncate block mt-0.5">${t.title}</h4>
+                      <span class="text-[10px] font-semibold mt-1 inline-flex items-center gap-1 ${isOverdue ? 'text-rose-500' : 'text-amber-400'}">
+                        <i data-lucide="clock" class="w-3 h-3"></i> ${remainingLabel}
+                      </span>
+                    </div>
+                    <button class="quickSubmitTaskBtn px-3.5 py-2 bg-rose-500 hover:bg-rose-400 text-slate-950 font-extrabold text-[10px] rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1"
+                            data-id="${t.id}" data-title="${t.title.replace(/"/g, '&quot;')}" data-subject="${t.subject.replace(/"/g, '&quot;')}" data-type="${t.type || 'Individu'}">
+                      <i data-lucide="file-up" class="w-3 h-3"></i> Kirim
+                    </button>
+                  </div>
+                `;
+              }).join("") : `
+                <div class="text-center py-6 flex flex-col items-center justify-center">
+                  <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-2">
+                    <i data-lucide="check-circle" class="w-5 h-5"></i>
+                  </div>
+                  <p class="text-xs text-slate-400 text-center">Luar biasa! Semua tugas Anda telah dikumpulkan atau tidak ada tugas yang mendesak saat ini.</p>
+                </div>
+              `}
+              ${urgentTasks.length > 2 ? `
+                <p class="text-[10px] text-slate-500 text-center font-semibold">+ ${urgentTasks.length - 2} tugas mendesak lainnya. Silakan cek menu Tugas.</p>
+              ` : ""}
+            </div>
           </div>
         </div>
       </div>
@@ -568,4 +741,201 @@ export async function renderDashboard(container: HTMLElement, userSession: any) 
       }
     });
   }
+
+  // Setor Bukti Bayar Kas Button Click Handler
+  const quickPayBtn = document.getElementById("quickPayKasBtn");
+  if (quickPayBtn) {
+    quickPayBtn.addEventListener("click", async () => {
+      if (unpaidWeeksCount === 0) {
+        Swal.fire({
+          icon: "success",
+          title: "Sudah Lunas!",
+          text: "Uang kas Anda untuk bulan ini sudah lunas sepenuhnya.",
+          background: "#0f172a",
+          color: "#f8fafc",
+          confirmButtonColor: "#06b6d4"
+        });
+        return;
+      }
+
+      let selectedFile: File | null = null;
+
+      const { value: formValues } = await Swal.fire({
+        title: "Setor Uang Kas Kelas",
+        background: "#0f172a",
+        color: "#f8fafc",
+        confirmButtonColor: "#10b981",
+        cancelButtonColor: "#334155",
+        confirmButtonText: "Kirim Bukti Pembayaran",
+        cancelButtonText: "Batal",
+        showCancelButton: true,
+        html: `
+          <div class="space-y-4 text-left font-sans mt-2">
+            <p class="text-xs text-slate-400 leading-relaxed font-sans">
+              Anda akan menyetorkan iuran kas bulanan Anda secara mandiri ke Bendahara Kelas. Bendahara akan memverifikasi setoran Anda.
+            </p>
+            
+            <div>
+              <label class="block text-xs text-slate-400 font-semibold mb-1">Pilih Minggu Tagihan</label>
+              <select id="payWeekSelect" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs outline-none focus:border-emerald-500">
+                ${unpaidWeeksLabels.map(label => `<option value="${label}">${label} (${formatRupiah(weeklyIuranRate)})</option>`).join("")}
+                <option value="Semua Tagihan">Semua Tagihan (${formatRupiah(myBillAmount)})</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 font-semibold mb-1">Jumlah Pembayaran (Rp)</label>
+              <input type="number" id="payAmountInput" value="${weeklyIuranRate}" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 font-semibold mb-1">Bukti Transfer / Nota (Foto/Berkas)</label>
+              <div id="pay-dropzone" class="border-2 border-dashed border-slate-850 hover:border-emerald-500/50 bg-slate-950/50 rounded-2xl p-6 text-center cursor-pointer transition-all relative group">
+                <input type="file" id="pay-file-input" class="hidden" accept="image/*,.pdf">
+                <div id="pay-dropzone-content" class="space-y-2">
+                  <p class="text-xs font-semibold text-slate-300">Pilih atau ambil foto bukti transfer</p>
+                  <p class="text-[9px] text-slate-500 font-mono">PNG, JPG, JPEG (Maks. 10MB)</p>
+                </div>
+                <div id="pay-selected-file" class="hidden flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl text-left">
+                  <span id="pay-filename" class="text-xs text-slate-300 truncate max-w-[180px]"></span>
+                  <button type="button" id="pay-remove-btn" class="text-rose-400 text-xs font-bold">Hapus</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="pay-progress" class="hidden space-y-1 p-3 bg-slate-900 rounded-2xl border border-slate-800">
+              <div class="flex justify-between text-[9px] font-mono font-bold">
+                <span class="text-slate-400">Mengunggah bukti...</span>
+                <span class="text-emerald-400" id="pay-pct">0%</span>
+              </div>
+              <div class="w-full bg-slate-950 h-1 rounded-full overflow-hidden">
+                <div id="pay-bar" class="h-full bg-emerald-500 rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        `,
+        didOpen: () => {
+          const selectEl = document.getElementById("payWeekSelect") as HTMLSelectElement;
+          const amountInput = document.getElementById("payAmountInput") as HTMLInputElement;
+          const dropzone = document.getElementById("pay-dropzone") as HTMLDivElement;
+          const fileInput = document.getElementById("pay-file-input") as HTMLInputElement;
+          const dropzoneContent = document.getElementById("pay-dropzone-content") as HTMLDivElement;
+          const selectedFileState = document.getElementById("pay-selected-file") as HTMLDivElement;
+          const filenameEl = document.getElementById("pay-filename") as HTMLSpanElement;
+          const removeBtn = document.getElementById("pay-remove-btn") as HTMLButtonElement;
+
+          selectEl.addEventListener("change", () => {
+            if (selectEl.value === "Semua Tagihan") {
+              amountInput.value = myBillAmount.toString();
+            } else {
+              amountInput.value = weeklyIuranRate.toString();
+            }
+          });
+
+          function handleFile(file: File) {
+            if (file.size > 10 * 1024 * 1024) {
+              Swal.showValidationMessage("Ukuran bukti maksimal 10MB!");
+              return;
+            }
+            selectedFile = file;
+            filenameEl.textContent = file.name;
+            dropzoneContent.classList.add("hidden");
+            selectedFileState.classList.remove("hidden");
+          }
+
+          dropzone.addEventListener("click", () => fileInput.click());
+          fileInput.addEventListener("change", () => {
+            if (fileInput.files && fileInput.files[0]) {
+              handleFile(fileInput.files[0]);
+            }
+          });
+
+          removeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectedFile = null;
+            fileInput.value = "";
+            selectedFileState.classList.add("hidden");
+            dropzoneContent.classList.remove("hidden");
+          });
+        },
+        preConfirm: async () => {
+          const selectEl = document.getElementById("payWeekSelect") as HTMLSelectElement;
+          const amountInput = document.getElementById("payAmountInput") as HTMLInputElement;
+          const amount = parseInt(amountInput.value, 10);
+
+          if (isNaN(amount) || amount <= 0) {
+            Swal.showValidationMessage("Harap isi jumlah pembayaran dengan benar!");
+            return false;
+          }
+
+          if (!selectedFile) {
+            Swal.showValidationMessage("Harap lampirkan foto bukti pembayaran!");
+            return false;
+          }
+
+          const progressContainer = document.getElementById("pay-progress") as HTMLDivElement;
+          const progressBar = document.getElementById("pay-bar") as HTMLDivElement;
+          const progressPct = document.getElementById("pay-pct") as HTMLSpanElement;
+
+          progressContainer.classList.remove("hidden");
+
+          try {
+            const uploadResult = await uploadFileToServer(selectedFile, (pct: any) => {
+              progressBar.style.width = pct + "%";
+              progressPct.textContent = pct + "%";
+            });
+
+            if (!uploadResult || !uploadResult.fileUrl) {
+              throw new Error("Gagal mengunggah foto bukti.");
+            }
+
+            const transactionPayload = {
+              userId: userSession.uid,
+              studentName: userSession.name,
+              amount: amount,
+              type: "in",
+              description: `Setor Kas: ${selectEl.value}`,
+              date: new Date(),
+              proofUrl: uploadResult.fileUrl,
+              status: "pending"
+            };
+
+            await addClassFundEntry(transactionPayload);
+            return true;
+          } catch (err: any) {
+            Swal.showValidationMessage("Error: " + err.message);
+            return false;
+          }
+        }
+      });
+
+      if (formValues) {
+        Swal.fire({
+          icon: "success",
+          title: "Bukti Terkirim!",
+          text: "Bukti pembayaran uang kas Anda berhasil dikirim ke Bendahara Kelas untuk diverifikasi.",
+          background: "#0f172a",
+          color: "#f8fafc",
+          confirmButtonColor: "#10b981"
+        });
+        renderDashboard(container, userSession); // Re-render dashboard
+      }
+    });
+  }
+
+  // Quick Task Submission Handlers
+  document.querySelectorAll(".quickSubmitTaskBtn").forEach((btn: any) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const taskObj = {
+        id: btn.dataset.id,
+        title: btn.dataset.title,
+        subject: btn.dataset.subject,
+        type: btn.dataset.type
+      };
+      await openSubmitTaskModal(taskObj, userSession, () => {
+        renderDashboard(container, userSession);
+      });
+    });
+  });
 }

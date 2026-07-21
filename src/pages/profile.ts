@@ -121,6 +121,11 @@ export async function renderProfile(container: HTMLElement, userSession: any) {
                   <input type="text" id="sLogoUrl" value="${settings?.logoUrl || ''}" ${!isSAdmin ? 'disabled' : ''} class="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:border-yellow-500 text-slate-100 outline-none text-xs disabled:opacity-50">
                 </div>
 
+                <div>
+                  <label class="block text-xs text-slate-400 font-semibold mb-1">Tarif Uang Kas Kelas Mingguan (Rupiah)</label>
+                  <input type="number" id="sWeeklyIuranRate" value="${settings?.weeklyIuranRate !== undefined ? settings.weeklyIuranRate : 5000}" ${!isSAdmin ? 'disabled' : ''} class="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:border-yellow-500 text-slate-100 outline-none text-sm disabled:opacity-50">
+                </div>
+
                 ${isSAdmin ? `
                   <button type="submit" class="w-full py-2.5 bg-yellow-500/10 hover:bg-yellow-500 border border-yellow-500/20 text-yellow-400 hover:text-slate-950 font-bold rounded-xl transition-all">
                     Simpan Konfigurasi Kelas
@@ -304,7 +309,8 @@ export async function renderProfile(container: HTMLElement, userSession: any) {
         const updatedSettings = {
           className: (document.getElementById("sClassName") as HTMLInputElement).value.trim(),
           motto: (document.getElementById("sMotto") as HTMLTextAreaElement).value.trim(),
-          logoUrl: (document.getElementById("sLogoUrl") as HTMLInputElement).value.trim()
+          logoUrl: (document.getElementById("sLogoUrl") as HTMLInputElement).value.trim(),
+          weeklyIuranRate: parseInt((document.getElementById("sWeeklyIuranRate") as HTMLInputElement).value, 10) || 5000
         };
 
         try {
