@@ -199,7 +199,7 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
   `;
 
   let activeTab = "games"; // games, shop, leaderboard
-  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | "flappy_packet" | null = null;
+  let activeGame: "cable" | "memory" | "quiz" | "spin" | "subnetting" | "port_defense" | "terminal_hacker" | "flappy_packet" | "fiber_splicer" | "vlan_patch" | "firewall_breaker" | null = null;
 
   const isKetuaKelas = userSession.role === "Super Admin" || 
                        userSession.role === "Ketua Kelas" || 
@@ -519,6 +519,48 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
                   </div>
                   <button class="launch-game-btn w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="flappy_packet">
                     Luncurkan Paket ⚡
+                  </button>
+                </div>
+
+                <!-- Game 9: Fiber Splicing Simulator -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-teal-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center text-xl">
+                      <i data-lucide="scissors" class="w-6 h-6 animate-pulse"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">Fiber Splicing Simulator</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Kupas, bersihkan, potong, dan lakukan penyambungan (splicing) inti serat optik. Capai redaman 0.00 dB untuk skor tertinggi!</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="fiber_splicer">
+                    Penyambungan Serat ⚡
+                  </button>
+                </div>
+
+                <!-- Game 10: VLAN Patch Panel Router -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-pink-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center text-xl">
+                      <i data-lucide="network" class="w-6 h-6 animate-pulse"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">VLAN Patch Panel Router</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Hubungkan kabel patch dari Switch Cisco ke Patch Panel sesuai dengan segmentasi VLAN-nya secara cepat dan tepat!</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-pink-500 hover:bg-pink-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="vlan_patch">
+                    Rapikan Kabel 🔌
+                  </button>
+                </div>
+
+                <!-- Game 11: Cyber Firewall Breaker -->
+                <div class="p-6 glass rounded-3xl space-y-4 border border-slate-850 hover:border-purple-400/30 hover:scale-[1.01] transition-all flex flex-col justify-between">
+                  <div class="space-y-2">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl">
+                      <i data-lucide="shield-alert" class="w-6 h-6 animate-bounce"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">Cyber Firewall Breaker</h3>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Hancurkan barisan Trojan, Malware, dan Bad Request headers menggunakan Firewall Shield pad-mu dalam game arkade seru ini!</p>
+                  </div>
+                  <button class="launch-game-btn w-full py-2.5 bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer" data-game="firewall_breaker">
+                    Hancurkan Ancaman 🛡️
                   </button>
                 </div>
               </div>
@@ -941,6 +983,12 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
       initTerminalHackerGame(playground);
     } else if (activeGame === "flappy_packet") {
       initFlappyPacketGame(playground);
+    } else if (activeGame === "fiber_splicer") {
+      initFiberSplicerGame(playground);
+    } else if (activeGame === "vlan_patch") {
+      initVlanPatchGame(playground);
+    } else if (activeGame === "firewall_breaker") {
+      initFirewallBreakerGame(playground);
     }
   }
 
@@ -3298,6 +3346,1440 @@ export async function renderMiniGames(container: HTMLElement, userSession: any) 
     }
 
     renderIntro();
+  }
+
+  // -------------------------------------------------------------
+  // GAME 9: FIBER SPLICING SIMULATOR
+  // -------------------------------------------------------------
+  function initFiberSplicerGame(p: HTMLElement) {
+    let step = 1; // 1: Stripping, 2: Cleaning, 3: Cleaving, 4: Align & Splice, 5: Splicing Animation, 6: Heat Shrinking, 7: Finished
+    let stripCount = 0;
+    let cleanCount = 0;
+    let cleavePosition = 0;
+    let cleaveDirection = 1;
+    let cleaveSpeed = 3;
+    let cleaveInterval: any = null;
+    
+    // Axis alignment states
+    let axisPhase = "X"; // "X", "Y", "Done"
+    let axisXPosition = 15;
+    let axisXDirection = 1.5;
+    let axisXLocked: number | null = null;
+    let axisYPosition = 85;
+    let axisYDirection = -1.8;
+    let axisYLocked: number | null = null;
+    let alignInterval: any = null;
+
+    // Splicing result calculation
+    let finalLoss = 0.00;
+
+    // Heat Shrink states
+    let currentTemp = 30;
+    let isHeaterOn = false;
+    let heatingInterval: any = null;
+
+    function renderGame() {
+      if (step === 1) {
+        // Stripping Step
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <div class="space-y-1">
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">Langkah 1 dari 5</span>
+              <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5 mt-2">
+                <i data-lucide="scissors" class="w-4 h-4 text-teal-400"></i> Kupas Jaket Fiber (Stripping)
+              </h2>
+              <p class="text-xs text-slate-400">Gunakan tang stripper serat optik untuk melepas jaket pelindung luar kabel.</p>
+            </div>
+
+            <div class="p-6 bg-slate-950/40 rounded-3xl border border-slate-850 space-y-6 flex flex-col items-center">
+              <div class="relative w-48 h-12 bg-slate-900 rounded-full flex items-center justify-start overflow-hidden border border-slate-800">
+                <div class="h-4 bg-slate-500 rounded-r-lg transition-all duration-300" style="width: ${100 - (stripCount * 20)}%"></div>
+                <div class="h-1 bg-cyan-400 rounded-r-lg transition-all duration-300" style="width: ${stripCount * 20}%"></div>
+              </div>
+
+              <div class="space-y-2 w-full max-w-xs">
+                <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                  <span>Progress Pengupasan:</span>
+                  <span class="text-teal-400 font-bold">${stripCount * 20}%</span>
+                </div>
+                <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                  <div class="bg-teal-500 h-full transition-all duration-300" style="width: ${stripCount * 20}%"></div>
+                </div>
+              </div>
+
+              <button id="stripBtn" class="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2 shadow-lg shadow-teal-500/10">
+                <i data-lucide="scissors" class="w-4 h-4"></i> TEKAN STRIPPER (${stripCount}/5)
+              </button>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        document.getElementById("stripBtn")?.addEventListener("click", () => {
+          stripCount++;
+          playRetroSound("click");
+          if (stripCount >= 5) {
+            playRetroSound("success");
+            step = 2;
+            renderGame();
+          } else {
+            renderGame();
+          }
+        });
+      } else if (step === 2) {
+        // Cleaning Step
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <div class="space-y-1">
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">Langkah 2 dari 5</span>
+              <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5 mt-2">
+                <i data-lucide="droplet" class="w-4 h-4 text-cyan-400"></i> Bersihkan Kaca Core (Cleaning)
+              </h2>
+              <p class="text-xs text-slate-400">Usap serat optik yang sudah dikupas menggunakan tisu beralkohol 99% agar bebas debu.</p>
+            </div>
+
+            <div class="p-6 bg-slate-950/40 rounded-3xl border border-slate-850 space-y-6 flex flex-col items-center">
+              <div class="relative w-48 h-12 bg-slate-900 rounded-full flex items-center justify-center overflow-hidden border border-slate-800">
+                <div class="absolute inset-0 flex items-center justify-around px-4 transition-opacity duration-300 ${cleanCount >= 3 ? 'opacity-0' : 'opacity-100'}">
+                  <div class="w-1.5 h-1.5 rounded-full bg-yellow-500/80 animate-ping"></div>
+                  <div class="w-1 h-1 rounded-full bg-yellow-600/80"></div>
+                  <div class="w-1.5 h-1.5 rounded-full bg-yellow-400/80"></div>
+                </div>
+                <div class="h-1.5 bg-cyan-400 w-32 rounded-full relative z-10"></div>
+              </div>
+
+              <div class="space-y-2 w-full max-w-xs">
+                <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                  <span>Kebersihan Core:</span>
+                  <span class="text-cyan-400 font-bold">${Math.min(100, Math.floor(cleanCount * 33.3))}%</span>
+                </div>
+                <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                  <div class="bg-cyan-400 h-full transition-all duration-300" style="width: ${Math.min(100, cleanCount * 33.4)}%"></div>
+                </div>
+              </div>
+
+              <button id="cleanBtn" class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2 shadow-lg shadow-cyan-500/10">
+                <i data-lucide="sparkles" class="w-4 h-4"></i> USAP DENGAN ALKOHOL (${cleanCount}/3)
+              </button>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        document.getElementById("cleanBtn")?.addEventListener("click", () => {
+          cleanCount++;
+          playRetroSound("coin");
+          if (cleanCount >= 3) {
+            playRetroSound("success");
+            step = 3;
+            renderGame();
+          } else {
+            renderGame();
+          }
+        });
+      } else if (step === 3) {
+        // Cleaving Step
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <div class="space-y-1">
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">Langkah 3 dari 5</span>
+              <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5 mt-2">
+                <i data-lucide="scissors" class="w-4 h-4 text-emerald-400"></i> Pemotongan Presisi (Cleaving)
+              </h2>
+              <p class="text-xs text-slate-400">Potong ujung serat optik dengan cleaver pada sudut mendekati 90 derajat secara sempurna.</p>
+            </div>
+
+            <div class="p-6 bg-slate-950/40 rounded-3xl border border-slate-850 space-y-6 flex flex-col items-center">
+              <div class="w-full bg-slate-900 h-8 rounded-2xl relative border border-slate-800 overflow-hidden">
+                <div class="absolute top-0 bottom-0 left-[42%] right-[42%] bg-emerald-500/30 border-l border-r border-emerald-500/50 flex items-center justify-center text-[10px] text-emerald-300 font-mono font-bold">
+                  90° ZONE
+                </div>
+                <div id="cleaveSliderPin" class="absolute w-2 h-full bg-cyan-400 top-0 transition-all shadow-[0_0_8px_rgba(34,211,238,0.8)]" style="left: ${cleavePosition}%"></div>
+              </div>
+
+              <div class="text-center text-xs text-slate-400">
+                Arahkan potongan pisau tepat di dalam zona 90°!
+              </div>
+
+              <button id="cleaveBtn" class="px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2 shadow-lg shadow-emerald-500/10">
+                <i data-lucide="zap" class="w-4 h-4"></i> TEKAN PISAU SEKARANG ⚡
+              </button>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        if (cleaveInterval) clearInterval(cleaveInterval);
+        cleaveInterval = setInterval(() => {
+          cleavePosition += cleaveSpeed * cleaveDirection;
+          if (cleavePosition >= 98) {
+            cleavePosition = 98;
+            cleaveDirection = -1;
+          } else if (cleavePosition <= 2) {
+            cleavePosition = 2;
+            cleaveDirection = 1;
+          }
+          const pin = document.getElementById("cleaveSliderPin");
+          if (pin) pin.style.left = `${cleavePosition}%`;
+        }, 20);
+
+        document.getElementById("cleaveBtn")?.addEventListener("click", () => {
+          clearInterval(cleaveInterval);
+          playRetroSound("click");
+
+          if (cleavePosition >= 41 && cleavePosition <= 59) {
+            playRetroSound("success");
+            step = 4;
+            renderGame();
+          } else {
+            playRetroSound("error");
+            Swal.fire({
+              icon: 'error',
+              title: 'Potongan Miring!',
+              text: 'Kabel terpotong tidak rata (kemiringan sudut > 1°). Ulangi pemotongan!',
+              background: '#0f172a',
+              color: '#f8fafc',
+              confirmButtonColor: '#ef4444'
+            }).then(() => {
+              cleavePosition = 0;
+              renderGame();
+            });
+          }
+        });
+      } else if (step === 4) {
+        // Alignment Step (X & Y core align)
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <div class="space-y-1">
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">Langkah 4 dari 5</span>
+              <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5 mt-2">
+                <i data-lucide="unplug" class="w-4 h-4 text-emerald-400"></i> Keselarasan Inti Kaca (Core Alignment)
+              </h2>
+              <p class="text-xs text-slate-400">Sejajarkan Core Kiri dan Core Kanan pada sumbu X dan sumbu Y agar sejajar sempurna.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 relative h-48 flex flex-col justify-between overflow-hidden">
+                <div class="text-[9px] font-mono text-emerald-500 flex justify-between">
+                  <span>CAM_${axisPhase} VIEW (X80)</span>
+                  <span class="animate-pulse">● ALIGN_ACTIVE</span>
+                </div>
+
+                <div class="relative flex-1 flex items-center justify-center">
+                  <div class="absolute inset-0 border-t border-b border-dashed border-slate-800/80 flex items-center">
+                    <div class="w-full border-b border-dashed border-emerald-500/20"></div>
+                  </div>
+                  <div class="absolute inset-0 border-l border-r border-dashed border-slate-800/80 flex justify-center">
+                    <div class="h-full border-l border-dashed border-emerald-500/20"></div>
+                  </div>
+
+                  <div class="absolute left-0 w-20 h-3 bg-cyan-500/40 rounded-r-lg border-y border-cyan-400 flex items-center" 
+                       style="transform: translateY(${axisPhase === 'X' ? (axisXPosition - 50) * 0.8 : (axisXLocked !== null ? (axisXLocked - 50) * 0.8 : 0)}px)">
+                    <div class="w-full h-1 bg-white"></div>
+                  </div>
+
+                  <div class="absolute right-0 w-20 h-3 bg-cyan-500/40 rounded-l-lg border-y border-cyan-400 flex items-center" 
+                       style="transform: translateY(${axisPhase === 'Y' ? (axisYPosition - 50) * 0.8 : (axisYLocked !== null ? (axisYLocked - 50) * 0.8 : 0)}px)">
+                    <div class="w-full h-1 bg-white"></div>
+                  </div>
+                </div>
+
+                <div class="text-[9px] font-mono text-slate-500 text-center">
+                  X_ALIGN: ${axisXLocked !== null ? axisXLocked.toFixed(1) + '%' : axisXPosition.toFixed(1) + '%'} | 
+                  Y_ALIGN: ${axisYLocked !== null ? axisYLocked.toFixed(1) + '%' : axisYPosition.toFixed(1) + '%'}
+                </div>
+              </div>
+
+              <div class="p-6 bg-slate-900/40 rounded-3xl border border-slate-850 flex flex-col justify-center gap-4">
+                <div class="space-y-1.5 text-left">
+                  <h4 class="text-xs font-bold text-slate-300">Target Sumbu Sejajar: 50.0%</h4>
+                  <p class="text-[10px] text-slate-400 font-sans">Kunci posisi saat garis sejajar tepat di tengah garis bidik!</p>
+                </div>
+
+                ${axisPhase === "X" ? `
+                  <button id="lockXBtn" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer">
+                    KUNCI SUMBU X
+                  </button>
+                ` : `
+                  <button id="lockYBtn" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer">
+                    KUNCI SUMBU Y
+                  </button>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        if (alignInterval) clearInterval(alignInterval);
+        alignInterval = setInterval(() => {
+          if (axisPhase === "X") {
+            axisXPosition += axisXDirection;
+            if (axisXPosition >= 85) axisXDirection = -1.5;
+            if (axisXPosition <= 15) axisXDirection = 1.5;
+          } else if (axisPhase === "Y") {
+            axisYPosition += axisYDirection;
+            if (axisYPosition >= 85) axisYDirection = -1.8;
+            if (axisYPosition <= 15) axisYDirection = 1.8;
+          }
+
+          const leftCore = p.querySelector("[style*='left-0']") as HTMLElement;
+          const rightCore = p.querySelector("[style*='right-0']") as HTMLElement;
+          if (leftCore && axisPhase === "X") {
+            leftCore.style.transform = `translateY(${(axisXPosition - 50) * 0.8}px)`;
+          }
+          if (rightCore && axisPhase === "Y") {
+            rightCore.style.transform = `translateY(${(axisYPosition - 50) * 0.8}px)`;
+          }
+        }, 20);
+
+        document.getElementById("lockXBtn")?.addEventListener("click", () => {
+          axisXLocked = axisXPosition;
+          playRetroSound("click");
+          axisPhase = "Y";
+          renderGame();
+        });
+
+        document.getElementById("lockYBtn")?.addEventListener("click", () => {
+          axisYLocked = axisYPosition;
+          playRetroSound("click");
+          clearInterval(alignInterval);
+
+          const devX = Math.abs((axisXLocked || 50) - 50);
+          const devY = Math.abs((axisYLocked || 50) - 50);
+          finalLoss = parseFloat(((devX * 0.003) + (devY * 0.003)).toFixed(2));
+          if (finalLoss < 0.01) finalLoss = 0.01;
+
+          step = 5;
+          renderGame();
+        });
+      } else if (step === 5) {
+        // Fusion Splicing animation view
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5">
+              <i data-lucide="zap" class="w-4 h-4 text-yellow-400 animate-pulse"></i> Fusi Pengelasan Listrik (Arc Fusing)
+            </h2>
+            <div class="p-8 bg-slate-950 rounded-3xl border border-slate-850 relative h-52 flex flex-col justify-center items-center overflow-hidden">
+              <div class="absolute w-12 h-32 bg-cyan-400/25 blur-xl animate-pulse"></div>
+              <div id="arcLightning" class="absolute h-1 w-12 bg-white shadow-[0_0_15px_rgba(34,211,238,1)] z-20"></div>
+
+              <div class="flex items-center justify-center gap-0.5 relative z-10 w-full">
+                <div class="w-32 h-1 bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]"></div>
+                <div class="w-32 h-1 bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]"></div>
+              </div>
+
+              <div class="absolute bottom-4 text-[10px] font-mono text-yellow-500 tracking-widest animate-pulse mt-4">
+                ⚡ DISCHARGE HIGH TENSION ARC SPLICER...
+              </div>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        setTimeout(() => {
+          const arc = document.getElementById("arcLightning");
+          if (arc) arc.classList.add("scale-y-[15]", "bg-cyan-300");
+          playRetroSound("success");
+
+          setTimeout(() => {
+            step = 6;
+            renderGame();
+          }, 1500);
+        }, 500);
+      } else if (step === 6) {
+        // Heat Shrinking Step
+        p.innerHTML = `
+          <div class="space-y-6 max-w-xl mx-auto text-center font-sans animate-fadeIn">
+            <div class="space-y-1">
+              <span class="px-2.5 py-1 text-[10px] font-mono font-bold bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl">Langkah 5 dari 5</span>
+              <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5 mt-2">
+                <i data-lucide="thermometer" class="w-4 h-4 text-rose-400"></i> Heat Shrink Protective Sleeve
+              </h2>
+              <p class="text-xs text-slate-400">Panggang tabung pelindung sambungan hingga menyusut rata. Tahan tombol heater sampai suhu stabil di 140°C - 160°C!</p>
+            </div>
+
+            <div class="p-6 bg-slate-950/40 rounded-3xl border border-slate-850 space-y-6 flex flex-col items-center">
+              <div class="text-2xl font-mono font-bold ${currentTemp >= 140 && currentTemp <= 160 ? 'text-emerald-400 animate-pulse' : 'text-rose-400'}">
+                ${currentTemp}°C
+              </div>
+
+              <div class="w-full bg-slate-900 h-6 rounded-2xl relative border border-slate-800 overflow-hidden">
+                <div class="absolute top-0 bottom-0 left-[60%] right-[20%] bg-emerald-500/20 border-l border-r border-emerald-500/30 flex items-center justify-center text-[9px] text-emerald-400 font-bold font-mono">
+                  140-160°C SLEEVE SHRINK
+                </div>
+                <div id="tempFill" class="bg-rose-500 h-full transition-all duration-100" style="width: ${Math.min(100, (currentTemp / 200) * 100)}%"></div>
+              </div>
+
+              <div class="text-xs text-slate-400 text-center">
+                Tahan tombol <strong class="text-rose-400">PANASKAN</strong> untuk menaikkan suhu. Lepaskan agar suhunya stabil!
+              </div>
+
+              <div class="flex gap-3 w-full">
+                <button id="heatBtn" class="flex-1 py-3.5 bg-rose-500 text-slate-950 hover:bg-rose-400 font-bold rounded-2xl text-xs transition-all cursor-pointer shadow-lg shadow-rose-500/15 select-none">
+                  🔥 PANASKAN (TAHAN)
+                </button>
+                <button id="finishHeatBtn" class="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer disabled:opacity-40" disabled>
+                  SELESAI
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        renderIcons();
+
+        if (heatingInterval) clearInterval(heatingInterval);
+        heatingInterval = setInterval(() => {
+          if (isHeaterOn) {
+            currentTemp += 4;
+            if (currentTemp > 200) currentTemp = 200;
+          } else {
+            currentTemp -= 2;
+            if (currentTemp < 30) currentTemp = 30;
+          }
+
+          const fill = document.getElementById("tempFill");
+          if (fill) fill.style.width = `${Math.min(100, (currentTemp / 200) * 100)}%`;
+          const tempText = p.querySelector(".font-mono.text-2xl");
+          if (tempText) {
+            tempText.textContent = `${currentTemp}°C`;
+            if (currentTemp >= 140 && currentTemp <= 160) {
+              tempText.className = "text-2xl font-mono font-bold text-emerald-400 animate-pulse";
+              const finishBtn = document.getElementById("finishHeatBtn") as HTMLButtonElement;
+              if (finishBtn) finishBtn.disabled = false;
+            } else {
+              tempText.className = "text-2xl font-mono font-bold text-rose-400";
+              const finishBtn = document.getElementById("finishHeatBtn") as HTMLButtonElement;
+              if (finishBtn) finishBtn.disabled = true;
+            }
+          }
+        }, 100);
+
+        const heatBtn = document.getElementById("heatBtn");
+        heatBtn?.addEventListener("mousedown", () => {
+          isHeaterOn = true;
+          playRetroSound("tick");
+        });
+        heatBtn?.addEventListener("mouseup", () => {
+          isHeaterOn = false;
+        });
+        heatBtn?.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          isHeaterOn = true;
+          playRetroSound("tick");
+        });
+        heatBtn?.addEventListener("touchend", () => {
+          isHeaterOn = false;
+        });
+
+        document.getElementById("finishHeatBtn")?.addEventListener("click", () => {
+          clearInterval(heatingInterval);
+          playRetroSound("success");
+          step = 7;
+          renderGame();
+        });
+      } else if (step === 7) {
+        clearInterval(heatingInterval);
+
+        let earnedXp = 10;
+        let earnedCoins = 5;
+        let rating = "CUKUP";
+        let colorClass = "text-yellow-400";
+
+        if (finalLoss <= 0.02) {
+          earnedXp = 45;
+          earnedCoins = 30;
+          rating = "SEMPURNA (PERFECT)";
+          colorClass = "text-emerald-400";
+        } else if (finalLoss <= 0.05) {
+          earnedXp = 30;
+          earnedCoins = 18;
+          rating = "SANGAT BAIK (EXCELLENT)";
+          colorClass = "text-cyan-400";
+        } else if (finalLoss <= 0.12) {
+          earnedXp = 20;
+          earnedCoins = 10;
+          rating = "BAIK (GOOD)";
+          colorClass = "text-blue-400";
+        }
+
+        p.innerHTML = `
+          <div class="space-y-6 max-w-md mx-auto text-center font-sans animate-fadeIn">
+            <div class="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-emerald-500/10">
+              <i data-lucide="award" class="w-8 h-8"></i>
+            </div>
+
+            <div class="space-y-2">
+              <h2 class="text-xl font-bold text-white">Splicing Selesai!</h2>
+              <p class="text-xs text-slate-400">Inti serat optik telah terhubung sempurna di dalam selongsong pelindung.</p>
+            </div>
+
+            <div class="p-6 bg-slate-950/50 rounded-3xl border border-slate-850 space-y-4">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-slate-400 font-sans">Redaman Sambungan:</span>
+                <span class="font-mono font-bold ${colorClass} text-lg">${finalLoss.toFixed(2)} dB</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-slate-400 font-sans">Peringkat Hasil:</span>
+                <span class="font-bold ${colorClass}">${rating}</span>
+              </div>
+
+              <div class="border-t border-slate-800 pt-4 flex justify-around text-center">
+                <div>
+                  <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">XP DIDAPAT</span>
+                  <span class="text-base font-bold text-emerald-400">+${earnedXp} XP</span>
+                </div>
+                <div>
+                  <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">KOIN EMAS</span>
+                  <span class="text-base font-bold text-yellow-400">+${earnedCoins} Koin</span>
+                </div>
+              </div>
+            </div>
+
+            <button id="exitSplicerBtn" class="w-full py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-[1.01] cursor-pointer shadow-lg shadow-teal-500/10">
+              KLAIM HADIAH & KELUAR
+            </button>
+          </div>
+        `;
+        renderIcons();
+
+        document.getElementById("exitSplicerBtn")?.addEventListener("click", async () => {
+          playRetroSound("click");
+          p.innerHTML = `
+            <div class="flex items-center justify-center py-12">
+              <div class="spinner"></div>
+              <span class="ml-3 text-slate-400">Menyimpan skor...</span>
+            </div>
+          `;
+          await addRewards(earnedXp, earnedCoins, `Fiber Splicer (${finalLoss.toFixed(2)} dB, ${rating})`);
+          activeGame = null;
+          loadGameProfile();
+        });
+      }
+    }
+
+    renderGame();
+  }
+
+  // -------------------------------------------------------------
+  // GAME 10: VLAN PATCH PANEL MANAGER
+  // -------------------------------------------------------------
+  function initVlanPatchGame(p: HTMLElement) {
+    let score = 0;
+    let secondsLeft = 30;
+    let timerInterval: any = null;
+    let selectedPort: number | null = null; // Switch port index (0 to 5)
+
+    const VLAN_TYPES = [
+      { vlan: 10, name: "Marketing", color: "bg-red-500 border-red-400 shadow-red-500/30", text: "text-red-400" },
+      { vlan: 20, name: "Engineering", color: "bg-blue-500 border-blue-400 shadow-blue-500/30", text: "text-blue-400" },
+      { vlan: 30, name: "Finance", color: "bg-emerald-500 border-emerald-400 shadow-emerald-500/30", text: "text-emerald-400" }
+    ];
+
+    let switchPorts: any[] = [];
+    let patchPorts: any[] = [];
+    let activeConnections: { from: number, to: number, colorClass: string }[] = [];
+
+    function generatePorts() {
+      switchPorts = [];
+      patchPorts = [];
+      activeConnections = [];
+      selectedPort = null;
+
+      for (let i = 0; i < 6; i++) {
+        const v = VLAN_TYPES[Math.floor(Math.random() * VLAN_TYPES.length)];
+        switchPorts.push({
+          id: i,
+          vlan: v.vlan,
+          color: v.color,
+          textColor: v.text,
+          connected: false
+        });
+      }
+
+      const vlanPool = switchPorts.map(sp => sp.vlan);
+      const shuffledVlans = [...vlanPool].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < 6; i++) {
+        const vlanVal = shuffledVlans[i];
+        const vInfo = VLAN_TYPES.find(v => v.vlan === vlanVal)!;
+        patchPorts.push({
+          id: i,
+          vlan: vlanVal,
+          color: vInfo.color,
+          textColor: vInfo.text,
+          label: `PC_${i + 1}`,
+          connected: false
+        });
+      }
+    }
+
+    function renderGameLayout() {
+      p.innerHTML = `
+        <div class="space-y-6 max-w-2xl mx-auto font-sans animate-fadeIn">
+          <div class="text-center space-y-1">
+            <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5">
+              <i data-lucide="network" class="w-4 h-4 text-pink-400 animate-pulse"></i> Cisco Switch & Patch Panel VLAN Routing
+            </h2>
+            <p class="text-xs text-slate-400">Hubungkan port Switch Catalyst ke Patch Panel dengan segmentasi VLAN warna yang sama!</p>
+          </div>
+
+          <div class="flex items-center justify-between text-xs font-mono px-2">
+            <span class="text-slate-400 font-sans">Sambungan Sukses: <strong class="text-pink-400 text-sm" id="vlanScore">${score}</strong></span>
+            <span class="text-amber-400 font-bold flex items-center gap-1">
+              <i data-lucide="timer" class="w-3.5 h-3.5 animate-spin"></i> <span id="vlanTimerText">${secondsLeft}s</span>
+            </span>
+          </div>
+
+          <div class="p-6 bg-slate-950/80 rounded-3xl border border-slate-850 space-y-12 relative overflow-hidden">
+            
+            <div class="space-y-2">
+              <div class="flex justify-between items-center px-1">
+                <span class="text-[9px] font-mono font-bold tracking-widest text-slate-500 uppercase">Cisco Catalyst 2960-X</span>
+                <span class="text-[9px] font-mono text-emerald-400 animate-pulse">● SYSTEM READY</span>
+              </div>
+              <div class="grid grid-cols-6 gap-3 p-4 bg-slate-900 border border-slate-800 rounded-2xl relative">
+                ${switchPorts.map((sp, idx) => {
+                  const isSel = selectedPort === idx;
+                  const isConn = sp.connected;
+                  return `
+                    <div class="flex flex-col items-center gap-1.5">
+                      <button class="switch-port-node w-10 h-10 rounded-xl bg-slate-950 border-2 transition-all flex items-center justify-center relative cursor-pointer
+                        ${isSel ? 'border-pink-500 scale-105 shadow-[0_0_8px_rgba(236,72,153,0.6)]' : 'border-slate-800 hover:border-slate-600'}
+                        ${isConn ? 'opacity-40 cursor-not-allowed' : ''}"
+                        data-idx="${idx}" ${isConn ? 'disabled' : ''}>
+                        
+                        <div class="w-5 h-5 bg-slate-900 border border-slate-750 rounded flex items-center justify-center flex-col gap-0.5 relative">
+                          <div class="w-3.5 h-1 bg-slate-850 rounded-t"></div>
+                          <div class="w-1.5 h-1.5 rounded-full ${sp.color} shadow-[0_0_4px_rgba(255,255,255,0.4)]"></div>
+                        </div>
+                      </button>
+                      <span class="text-[8px] font-mono text-slate-500">Fa0/${idx+1}</span>
+                      <span class="text-[8px] font-mono font-bold ${sp.textColor}">VLAN ${sp.vlan}</span>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex justify-between items-center px-1">
+                <span class="text-[9px] font-mono font-bold tracking-widest text-slate-500 uppercase">AMP Category 6 Patch Panel</span>
+                <span class="text-[9px] font-mono text-slate-500">RJ-45 OUTLETS</span>
+              </div>
+              <div class="grid grid-cols-6 gap-3 p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                ${patchPorts.map((pp, idx) => {
+                  const isConn = pp.connected;
+                  return `
+                    <div class="flex flex-col items-center gap-1.5">
+                      <button class="patch-port-node w-10 h-10 rounded-xl bg-slate-950 border-2 border-slate-800 hover:border-slate-600 transition-all flex items-center justify-center relative cursor-pointer
+                        ${isConn ? 'opacity-40 cursor-not-allowed' : ''}"
+                        data-idx="${idx}" ${isConn ? 'disabled' : ''}>
+                        
+                        <div class="w-5 h-5 bg-slate-900 border border-slate-750 rounded flex items-center justify-center flex-col gap-0.5">
+                          <div class="w-3.5 h-1 bg-slate-850 rounded-t"></div>
+                          <div class="w-1.5 h-1.5 rounded-full ${pp.color}"></div>
+                        </div>
+                      </button>
+                      <span class="text-[8px] font-mono text-slate-400 font-bold">${pp.label}</span>
+                      <span class="text-[8px] font-mono font-bold ${pp.textColor}">VLAN ${pp.vlan}</span>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+
+            ${activeConnections.length > 0 ? `
+              <div class="p-3 bg-slate-900/50 border border-slate-850 rounded-2xl space-y-1">
+                <span class="text-[9px] font-mono text-slate-500 block">KABEL TERHUBUNG:</span>
+                <div class="flex flex-wrap gap-2">
+                  ${activeConnections.map(c => `
+                    <span class="text-[9px] font-mono px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full ${c.colorClass}"></span> Fa0/${c.from+1} ➔ PC_${c.to+1}
+                    </span>
+                  `).join("")}
+                </div>
+              </div>
+            ` : ""}
+
+          </div>
+        </div>
+      `;
+      renderIcons();
+
+      document.querySelectorAll(".switch-port-node").forEach((btn: any) => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx);
+          if (switchPorts[idx].connected) return;
+          selectedPort = idx;
+          playRetroSound("click");
+          renderGameLayout();
+        });
+      });
+
+      document.querySelectorAll(".patch-port-node").forEach((btn: any) => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx);
+          if (selectedPort === null) {
+            playRetroSound("error");
+            toast.error("Pilih salah satu port Cisco Switch terlebih dahulu!");
+            return;
+          }
+          if (patchPorts[idx].connected) return;
+
+          const swPort = switchPorts[selectedPort];
+          const ptPort = patchPorts[idx];
+
+          if (swPort.vlan === ptPort.vlan) {
+            playRetroSound("coin");
+            swPort.connected = true;
+            ptPort.connected = true;
+            activeConnections.push({
+              from: selectedPort,
+              to: idx,
+              colorClass: swPort.color
+            });
+
+            score++;
+            selectedPort = null;
+
+            const allConn = switchPorts.every(sp => sp.connected);
+            if (allConn) {
+              playRetroSound("success");
+              toast.success("Round Selesai! Semua VLAN terhubung sempurna.");
+              generatePorts();
+            }
+
+            renderGameLayout();
+          } else {
+            playRetroSound("error");
+            toast.error(`VLAN mismatch! Port Fa0/${selectedPort+1} (VLAN ${swPort.vlan}) tidak bisa terhubung ke outlet VLAN ${ptPort.vlan}.`);
+            selectedPort = null;
+            renderGameLayout();
+          }
+        });
+      });
+    }
+
+    function initTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        secondsLeft--;
+        const timeEl = document.getElementById("vlanTimerText");
+        if (timeEl) timeEl.textContent = `${secondsLeft}s`;
+
+        if (secondsLeft <= 0) {
+          clearInterval(timerInterval);
+          handleGameOver();
+        }
+      }, 1000);
+    }
+
+    async function handleGameOver() {
+      cleanupMiniGames();
+
+      const earnedXp = Math.min(50, (score * 8) + 5);
+      const earnedCoins = Math.min(30, (score * 4) + 2);
+
+      p.innerHTML = `
+        <div class="space-y-6 max-w-md mx-auto text-center font-sans animate-fadeIn">
+          <div class="w-16 h-16 rounded-full bg-pink-500/10 text-pink-400 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-pink-500/10">
+            <i data-lucide="network" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-xl font-bold text-white">Waktu Habis!</h2>
+            <p class="text-xs text-slate-400">Refleks perakitan dan segmentasi VLAN-mu sangat berharga bagi administrator NOC!</p>
+          </div>
+
+          <div class="p-6 bg-slate-950/50 rounded-3xl border border-slate-850 space-y-4">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Total VLAN Terpasang:</span>
+              <span class="font-mono font-bold text-pink-400 text-lg">${score} Kabel</span>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 flex justify-around text-center">
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">XP DIDAPAT</span>
+                <span class="text-base font-bold text-emerald-400">+${earnedXp} XP</span>
+              </div>
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">KOIN EMAS</span>
+                <span class="text-base font-bold text-yellow-400">+${earnedCoins} Koin</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="exitVlanBtn" class="w-full py-3.5 bg-gradient-to-r from-pink-500 to-rose-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-[1.01] cursor-pointer shadow-lg shadow-pink-500/10">
+            KLAIM HADIAH & KELUAR
+          </button>
+        </div>
+      `;
+      renderIcons();
+
+      document.getElementById("exitVlanBtn")?.addEventListener("click", async () => {
+        playRetroSound("click");
+        p.innerHTML = `
+          <div class="flex items-center justify-center py-12">
+            <div class="spinner"></div>
+            <span class="ml-3 text-slate-400">Menyimpan skor...</span>
+          </div>
+        `;
+        if (score > 0) {
+          await addRewards(earnedXp, earnedCoins, `VLAN Router Master (${score} Sambungan)`);
+        }
+        activeGame = null;
+        loadGameProfile();
+      });
+    }
+
+    generatePorts();
+    renderGameLayout();
+    initTimer();
+  }
+
+  // -------------------------------------------------------------
+  // GAME 11: CYBER FIREWALL BREAKER
+  // -------------------------------------------------------------
+  function initFirewallBreakerGame(p: HTMLElement) {
+    let score = 0;
+    let level = 1;
+    let lives = 3;
+    let gameActive = false;
+    let animationFrameId: number | null = null;
+
+    // Canvas size
+    const canvasWidth = 480;
+    const canvasHeight = 360;
+
+    p.innerHTML = `
+      <div class="space-y-6 max-w-lg mx-auto font-sans animate-fadeIn">
+        <div class="text-center space-y-1">
+          <h2 class="text-base font-bold text-white flex items-center justify-center gap-1.5">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400 animate-bounce"></i> Cyber Firewall Breaker
+          </h2>
+          <p class="text-xs text-slate-400 font-sans">Hancurkan Trojan, Malware, & DDoS packets menggunakan Firewall Shield.</p>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-mono px-2">
+          <span class="text-slate-400">Skor: <strong class="text-purple-400 text-sm" id="breakerScore">0</strong></span>
+          <span class="text-emerald-400 font-bold">Level: <span id="breakerLevel">1</span></span>
+          <span class="text-rose-400 font-bold flex items-center gap-1">
+            <span id="breakerLives">❤️❤️❤️</span>
+          </span>
+        </div>
+
+        <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-center items-center">
+          <canvas id="breakerCanvas" width="${canvasWidth}" height="${canvasHeight}" class="w-full h-full block cursor-crosshair"></canvas>
+          
+          <!-- Start overlay -->
+          <div id="breakerStartOverlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center space-y-4 z-10">
+            <div class="w-14 h-14 rounded-full bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl shadow-lg shadow-purple-500/10">
+              <i data-lucide="play" class="w-6 h-6 animate-pulse"></i>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-sm font-bold text-white">Sistem Pertahanan Firewall</h3>
+              <p class="text-[11px] text-slate-400 max-w-xs">Gunakan mouse/touchpad (geser) atau tombol panah keyboard / tombol di bawah untuk mengontrol perisai pelindung.</p>
+            </div>
+            <button id="startBreakerBtn" class="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-slate-950 font-bold rounded-2xl text-xs transition-all cursor-pointer">
+              MULAI SEKARANG ⚡
+            </button>
+          </div>
+        </div>
+
+        <!-- Touch Controls for Mobile/Tablet players -->
+        <div class="grid grid-cols-2 gap-4">
+          <button id="btnLeft" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-purple-500/10 active:text-purple-400 rounded-2xl flex items-center justify-center cursor-pointer transition-all select-none">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <button id="btnRight" class="py-4 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400 active:bg-purple-500/10 active:text-purple-400 rounded-2xl flex items-center justify-center cursor-pointer transition-all select-none">
+            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    `;
+    renderIcons();
+
+    const canvas = document.getElementById("breakerCanvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+    const startOverlay = document.getElementById("breakerStartOverlay");
+    const scoreEl = document.getElementById("breakerScore");
+    const levelEl = document.getElementById("breakerLevel");
+    const livesEl = document.getElementById("breakerLives");
+
+    // Game variables
+    let paddleWidth = 80;
+    const paddleHeight = 10;
+    let paddleX = (canvasWidth - paddleWidth) / 2;
+    const paddleY = canvasHeight - 25;
+    const paddleSpeed = 7;
+
+    // Multiple ball support
+    interface Ball {
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      radius: number;
+      speed: number;
+    }
+    let balls: Ball[] = [];
+
+    interface Brick {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      status: number; // hits left
+      maxStatus: number;
+      points: number;
+      color: string;
+      name: string;
+    }
+    let bricks: Brick[] = [];
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      color: string;
+      alpha: number;
+      life: number;
+      maxLife: number;
+    }
+    let particles: Particle[] = [];
+
+    interface PowerUp {
+      x: number;
+      y: number;
+      type: "W" | "E" | "S"; // W: Wide, E: Extra ball, S: Slow ball
+      color: string;
+      speed: number;
+      radius: number;
+    }
+    let powerups: PowerUp[] = [];
+
+    // Keys state
+    const keys: { [key: string]: boolean } = {};
+    let touchLeft = false;
+    let touchRight = false;
+
+    // Active powerup effects
+    let widePaddleTimer: any = null;
+
+    function createBricks() {
+      bricks = [];
+      const rows = 5;
+      const cols = 7;
+      const bWidth = 54;
+      const bHeight = 14;
+      const bPadding = 7;
+      const bOffsetTop = 35;
+      const bOffsetLeft = 25;
+
+      const rowConfig = [
+        { name: "DDoS", hits: 2, points: 40, color: "#a855f7" },    // Row 0: Purple
+        { name: "Trojan", hits: 1, points: 30, color: "#ef4444" },  // Row 1: Red
+        { name: "Malware", hits: 1, points: 20, color: "#f97316" }, // Row 2: Orange
+        { name: "Spam", hits: 1, points: 10, color: "#eab308" },    // Row 3: Yellow
+        { name: "Request", hits: 1, points: 5, color: "#06b6d4" }   // Row 4: Blue
+      ];
+
+      for (let r = 0; r < rows; r++) {
+        const conf = rowConfig[r];
+        for (let c = 0; c < cols; c++) {
+          const bX = c * (bWidth + bPadding) + bOffsetLeft;
+          const bY = r * (bHeight + bPadding) + bOffsetTop;
+          bricks.push({
+            x: bX,
+            y: bY,
+            width: bWidth,
+            height: bHeight,
+            status: conf.hits,
+            maxStatus: conf.hits,
+            points: conf.points,
+            color: conf.color,
+            name: conf.name
+          });
+        }
+      }
+    }
+
+    function createBall() {
+      const angle = (Math.random() * 0.4 + 0.3) * Math.PI; // random angle between ~54 and ~126 degrees
+      const speed = 2.5 + level * 0.4;
+      balls.push({
+        x: paddleX + paddleWidth / 2,
+        y: paddleY - 10,
+        dx: Math.cos(angle) * speed,
+        dy: -Math.sin(angle) * speed,
+        radius: 4,
+        speed: speed
+      });
+    }
+
+    function spawnParticles(x: number, y: number, color: string) {
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const pSpeed = Math.random() * 2 + 1;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * pSpeed,
+          vy: Math.sin(angle) * pSpeed,
+          radius: Math.random() * 2 + 1,
+          color: color,
+          alpha: 1,
+          life: 0,
+          maxLife: 30 + Math.random() * 20
+        });
+      }
+    }
+
+    function spawnPowerUp(x: number, y: number) {
+      if (Math.random() > 0.18) return; // 18% chance
+
+      const types: ("W" | "E" | "S")[] = ["W", "E", "S"];
+      const type = types[Math.floor(Math.random() * types.length)];
+      let color = "#10b981"; // Emerald for wide
+      if (type === "E") color = "#f43f5e"; // Pink for extra ball
+      if (type === "S") color = "#3b82f6"; // Blue for slow ball
+
+      powerups.push({
+        x: x,
+        y: y,
+        type: type,
+        color: color,
+        speed: 1.2,
+        radius: 7
+      });
+    }
+
+    function applyPowerUp(type: "W" | "E" | "S") {
+      playRetroSound("coin");
+      if (type === "W") {
+        paddleWidth = 120;
+        toast.info("Powerup: Perisai Melebar!");
+        if (widePaddleTimer) clearTimeout(widePaddleTimer);
+        widePaddleTimer = setTimeout(() => {
+          paddleWidth = 80;
+          toast.info("Perisai kembali ke ukuran normal.");
+        }, 8000);
+      } else if (type === "E") {
+        toast.info("Powerup: Multi Paket Data!");
+        // Add another ball
+        createBall();
+      } else if (type === "S") {
+        toast.info("Powerup: Server Slow Motion!");
+        balls.forEach(b => {
+          b.dx *= 0.7;
+          b.dy *= 0.7;
+        });
+      }
+    }
+
+    function update() {
+      // 1. Move Paddle
+      if (keys["ArrowLeft"] || keys["a"] || touchLeft) {
+        paddleX -= paddleSpeed;
+        if (paddleX < 0) paddleX = 0;
+      }
+      if (keys["ArrowRight"] || keys["d"] || touchRight) {
+        paddleX += paddleSpeed;
+        if (paddleX > canvasWidth - paddleWidth) paddleX = canvasWidth - paddleWidth;
+      }
+
+      // 2. Move Balls
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const b = balls[i];
+        b.x += b.dx;
+        b.y += b.dy;
+
+        // Bounce left / right walls
+        if (b.x - b.radius < 0) {
+          b.x = b.radius;
+          b.dx = -b.dx;
+          playRetroSound("click");
+        } else if (b.x + b.radius > canvasWidth) {
+          b.x = canvasWidth - b.radius;
+          b.dx = -b.dx;
+          playRetroSound("click");
+        }
+
+        // Bounce ceiling
+        if (b.y - b.radius < 0) {
+          b.y = b.radius;
+          b.dy = -b.dy;
+          playRetroSound("click");
+        }
+
+        // Drop out of screen (bottom)
+        if (b.y + b.radius > canvasHeight) {
+          balls.splice(i, 1);
+          continue;
+        }
+
+        // Paddle Collision
+        if (
+          b.y + b.radius >= paddleY &&
+          b.y - b.radius <= paddleY + paddleHeight &&
+          b.x >= paddleX &&
+          b.x <= paddleX + paddleWidth
+        ) {
+          playRetroSound("click");
+          // Calculate bounce angle based on where the ball hit the paddle
+          const hitPos = (b.x - paddleX) / paddleWidth; // 0 (left) to 1 (right)
+          const bounceAngle = (hitPos * 0.6 + 0.2) * Math.PI; // angle between ~36 and ~144 degrees
+          const currentSpeed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+          b.dx = Math.cos(bounceAngle) * currentSpeed;
+          b.dy = -Math.sin(bounceAngle) * currentSpeed;
+          // resolve overlap
+          b.y = paddleY - b.radius;
+        }
+
+        // Brick Collisions
+        for (let j = 0; j < bricks.length; j++) {
+          const br = bricks[j];
+          if (br.status <= 0) continue;
+
+          if (
+            b.x + b.radius >= br.x &&
+            b.x - b.radius <= br.x + br.width &&
+            b.y + b.radius >= br.y &&
+            b.y - b.radius <= br.y + br.height
+          ) {
+            br.status--;
+            score += br.points;
+            if (scoreEl) scoreEl.textContent = String(score);
+
+            spawnParticles(b.x, b.y, br.color);
+            playRetroSound("coin");
+
+            if (br.status <= 0) {
+              spawnPowerUp(br.x + br.width / 2, br.y + br.height / 2);
+            }
+
+            // Simple bounce direction logic
+            const overlapX = Math.min(b.x + b.radius - br.x, br.x + br.width - (b.x - b.radius));
+            const overlapY = Math.min(b.y + b.radius - br.y, br.y + br.height - (b.y - b.radius));
+
+            if (overlapX < overlapY) {
+              b.dx = -b.dx;
+            } else {
+              b.dy = -b.dy;
+            }
+            break;
+          }
+        }
+      }
+
+      // Check if all balls are lost
+      if (balls.length === 0) {
+        lives--;
+        playRetroSound("error");
+        if (livesEl) livesEl.textContent = "❤️".repeat(lives);
+
+        if (lives <= 0) {
+          gameActive = false;
+          handleGameOver(false);
+          return;
+        } else {
+          // Restart with one ball
+          createBall();
+        }
+      }
+
+      // Check if all bricks are cleared
+      const activeBricks = bricks.filter(br => br.status > 0);
+      if (activeBricks.length === 0) {
+        level++;
+        playRetroSound("success");
+        if (levelEl) levelEl.textContent = String(level);
+        toast.success(`Selamat! Masuk ke Level ${level}`);
+        createBricks();
+        balls = [];
+        createBall();
+      }
+
+      // 3. Move Powerups
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const pu = powerups[i];
+        pu.y += pu.speed;
+
+        // Collision with paddle
+        if (
+          pu.y + pu.radius >= paddleY &&
+          pu.y - pu.radius <= paddleY + paddleHeight &&
+          pu.x >= paddleX &&
+          pu.x <= paddleX + paddleWidth
+        ) {
+          applyPowerUp(pu.type);
+          powerups.splice(i, 1);
+          continue;
+        }
+
+        // Out of screen
+        if (pu.y - pu.radius > canvasHeight) {
+          powerups.splice(i, 1);
+        }
+      }
+
+      // 4. Move Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life++;
+        pt.alpha = 1 - pt.life / pt.maxLife;
+
+        if (pt.life >= pt.maxLife) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function draw() {
+      // Background gradient
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Draw horizontal & vertical grid lines (retro cyber grid)
+      ctx.strokeStyle = "rgba(139, 92, 246, 0.04)";
+      ctx.lineWidth = 1;
+      const gridSize = 24;
+      for (let x = 0; x < canvasWidth; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvasHeight);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvasHeight; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvasWidth, y);
+        ctx.stroke();
+      }
+
+      // Draw Bricks
+      bricks.forEach(br => {
+        if (br.status <= 0) return;
+
+        // Glass reflection / shadow
+        ctx.fillStyle = br.color;
+        // Draw slightly transparent or cracked if DDoS brick has 1 hit remaining
+        if (br.name === "DDoS" && br.status === 1) {
+          ctx.fillStyle = "#c084fc"; // lighter purple
+        }
+
+        ctx.beginPath();
+        ctx.roundRect(br.x, br.y, br.width, br.height, 3);
+        ctx.fill();
+
+        // Overlay gloss lines
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(br.x, br.y);
+        ctx.lineTo(br.x + br.width, br.y);
+        ctx.stroke();
+      });
+
+      // Draw Paddle (Firewall Shield)
+      ctx.fillStyle = "#a855f7"; // Neon Purple
+      ctx.beginPath();
+      ctx.roundRect(paddleX, paddleY, paddleWidth, paddleHeight, 5);
+      ctx.fill();
+
+      // Draw neon border on paddle
+      ctx.strokeStyle = "#f43f5e"; // Pink border
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Draw Balls (IP Packets)
+      balls.forEach(b => {
+        ctx.fillStyle = "#06b6d4"; // Vibrant cyan
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Mini glow halo
+        ctx.fillStyle = "rgba(6, 182, 212, 0.2)";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius + 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Draw Powerups
+      powerups.forEach(pu => {
+        ctx.fillStyle = pu.color;
+        ctx.beginPath();
+        ctx.arc(pu.x, pu.y, pu.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw character label inside pill
+        ctx.fillStyle = "#000000";
+        ctx.font = "bold 9px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pu.type, pu.x, pu.y);
+      });
+
+      // Draw Particles
+      particles.forEach(pt => {
+        ctx.fillStyle = pt.color;
+        ctx.globalAlpha = pt.alpha;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0; // reset
+
+      // Overlay arcade scanlines
+      ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+      for (let y = 0; y < canvasHeight; y += 3) {
+        ctx.fillRect(0, y, canvasWidth, 1);
+      }
+    }
+
+    function gameLoop() {
+      if (!gameActive) return;
+      update();
+      draw();
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // Controls setup
+    function setupInput() {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        keys[e.key] = true;
+      };
+      const handleKeyUp = (e: KeyboardEvent) => {
+        keys[e.key] = false;
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keyup", handleKeyUp);
+
+      // Track mouse position on canvas to steer paddle
+      const handleMouseMove = (e: MouseEvent) => {
+        const rect = canvas.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        // Map relative pixel coordinates directly to coordinate space of canvas
+        const scaleX = canvasWidth / rect.width;
+        const mappedX = relativeX * scaleX;
+        paddleX = mappedX - paddleWidth / 2;
+
+        if (paddleX < 0) paddleX = 0;
+        if (paddleX > canvasWidth - paddleWidth) paddleX = canvasWidth - paddleWidth;
+      };
+      canvas.addEventListener("mousemove", handleMouseMove);
+
+      // Touch controls
+      const btnL = document.getElementById("btnLeft");
+      const btnR = document.getElementById("btnRight");
+
+      const lStart = () => { touchLeft = true; };
+      const lEnd = () => { touchLeft = false; };
+      const rStart = () => { touchRight = true; };
+      const rEnd = () => { touchRight = false; };
+
+      btnL?.addEventListener("mousedown", lStart);
+      btnL?.addEventListener("mouseup", lEnd);
+      btnL?.addEventListener("mouseleave", lEnd);
+      btnL?.addEventListener("touchstart", (e) => { e.preventDefault(); lStart(); });
+      btnL?.addEventListener("touchend", lEnd);
+
+      btnR?.addEventListener("mousedown", rStart);
+      btnR?.addEventListener("mouseup", rEnd);
+      btnR?.addEventListener("mouseleave", rEnd);
+      btnR?.addEventListener("touchstart", (e) => { e.preventDefault(); rStart(); });
+      btnR?.addEventListener("touchend", rEnd);
+
+      // Return cleanup handler
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("keyup", handleKeyUp);
+        canvas.removeEventListener("mousemove", handleMouseMove);
+        if (widePaddleTimer) clearTimeout(widePaddleTimer);
+      };
+    }
+
+    const inputCleanup = setupInput();
+
+    async function handleGameOver(won: boolean) {
+      gameActive = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      inputCleanup();
+
+      const earnedXp = Math.min(60, (score * 0.15) + 5);
+      const earnedCoins = Math.min(40, (score * 0.08) + 2);
+
+      p.innerHTML = `
+        <div class="space-y-6 max-w-md mx-auto text-center font-sans animate-fadeIn">
+          <div class="w-16 h-16 rounded-full bg-purple-500/10 text-purple-400 flex items-center justify-center text-3xl mx-auto shadow-lg shadow-purple-500/10">
+            <i data-lucide="shield-alert" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-2">
+            <h2 class="text-xl font-bold text-white">Sistem Terbobol!</h2>
+            <p class="text-xs text-slate-400">Kerja bagus, kamu berhasil menghalau banyak ancaman DDoS dan Trojan sebelum Firewall mati.</p>
+          </div>
+
+          <div class="p-6 bg-slate-950/50 rounded-3xl border border-slate-850 space-y-4">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Skor Pertahanan:</span>
+              <span class="font-mono font-bold text-purple-400 text-lg">${score} Poin</span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400 font-sans">Level Maksimum:</span>
+              <span class="font-mono font-bold text-emerald-400">Level ${level}</span>
+            </div>
+
+            <div class="border-t border-slate-800 pt-4 flex justify-around text-center">
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">XP DIDAPAT</span>
+                <span class="text-base font-bold text-emerald-400">+${Math.floor(earnedXp)} XP</span>
+              </div>
+              <div>
+                <span class="block text-[10px] text-slate-500 uppercase font-bold tracking-wider">KOIN EMAS</span>
+                <span class="text-base font-bold text-yellow-400">+${Math.floor(earnedCoins)} Koin</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="exitBreakerBtn" class="w-full py-3.5 bg-gradient-to-r from-purple-500 to-pink-500 text-slate-950 font-bold rounded-2xl text-xs transition-all hover:scale-[1.01] cursor-pointer shadow-lg shadow-purple-500/10">
+            KLAIM HADIAH & KELUAR
+          </button>
+        </div>
+      `;
+      renderIcons();
+
+      document.getElementById("exitBreakerBtn")?.addEventListener("click", async () => {
+        playRetroSound("click");
+        p.innerHTML = `
+          <div class="flex items-center justify-center py-12">
+            <div class="spinner"></div>
+            <span class="ml-3 text-slate-400">Menyimpan skor...</span>
+          </div>
+        `;
+        if (score > 0) {
+          await addRewards(Math.floor(earnedXp), Math.floor(earnedCoins), `Firewall Breaker (${score} Poin, Lvl ${level})`);
+        }
+        activeGame = null;
+        loadGameProfile();
+      });
+    }
+
+    document.getElementById("startBreakerBtn")?.addEventListener("click", () => {
+      if (startOverlay) startOverlay.style.display = "none";
+      playRetroSound("success");
+      gameActive = true;
+      createBricks();
+      createBall();
+      gameLoop();
+    });
   }
 
   loadGameProfile();
