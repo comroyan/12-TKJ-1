@@ -225,7 +225,7 @@ export async function renderGaleri(container: HTMLElement, userSession: any) {
         cancelButtonText: "Batal",
         confirmButtonColor: "#06b6d4",
         cancelButtonColor: "#334155",
-        preConfirm: async () => {
+        preConfirm: () => {
           const title = (document.getElementById("pTitle") as HTMLInputElement).value.trim();
           const description = (document.getElementById("pDesc") as HTMLTextAreaElement).value.trim();
           const fileInput = document.getElementById("pPhotoFile") as HTMLInputElement;
@@ -236,20 +236,90 @@ export async function renderGaleri(container: HTMLElement, userSession: any) {
             return false;
           }
 
-          toast.info("Mengunggah foto momen...");
-          const uploadResult = await uploadFileToServer(file);
-          const imageUrl = uploadResult.fileUrl;
-
-          return { title, description, imageUrl, uploadedBy: userSession.name, userId: userSession.uid };
+          return { title, description, file };
         }
       }).then(async (result) => {
         if (result.isConfirmed) {
+          const { title, description, file } = result.value;
+
+          // Open a custom modal dedicated for real-time progress visualization
+          Swal.fire({
+            title: "Mengunggah Foto...",
+            background: "#0f172a",
+            color: "#f8fafc",
+            html: `
+              <div class="space-y-4 font-sans text-center mt-3">
+                <div class="flex items-center justify-center">
+                  <div class="relative w-14 h-14 flex items-center justify-center">
+                    <!-- Rotating loader ring -->
+                    <div class="absolute inset-0 border-4 border-slate-800 border-t-cyan-500 rounded-full animate-spin"></div>
+                    <i data-lucide="camera" class="w-5 h-5 text-cyan-400"></i>
+                  </div>
+                </div>
+
+                <div class="space-y-1">
+                  <p id="pUploadStatusText" class="text-xs text-slate-300 font-medium animate-pulse">Menyiapkan & mengompresi gambar...</p>
+                  <p class="text-[10px] text-slate-500 font-mono" id="pUploadSizeText">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                </div>
+
+                <!-- Custom Glowing Progress Bar Track -->
+                <div class="w-full bg-slate-950/80 border border-slate-800 rounded-full h-3 overflow-hidden relative p-[2px]">
+                  <div id="pUploadProgressBar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full w-[0%] rounded-full transition-all duration-200 shadow-[0_0_8px_rgba(6,182,212,0.6)]"></div>
+                </div>
+
+                <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono px-0.5">
+                  <span id="pUploadProgressPercent">0%</span>
+                  <span id="pUploadProgressDetail">0.00 MB / ${(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                </div>
+              </div>
+            `,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+              renderIcons();
+            }
+          });
+
+          const progressBar = document.getElementById("pUploadProgressBar");
+          const progressPercent = document.getElementById("pUploadProgressPercent");
+          const progressDetail = document.getElementById("pUploadProgressDetail");
+          const statusText = document.getElementById("pUploadStatusText");
+
           try {
-            await addGalleryPhoto(result.value);
+            const uploadResult = await uploadFileToServer(file, (progress) => {
+              if (statusText) statusText.textContent = "Mengunggah berkas ke server...";
+              if (progressBar) progressBar.style.width = `${progress}%`;
+              if (progressPercent) progressPercent.textContent = `${progress}%`;
+
+              const totalMB = (file.size / (1024 * 1024)).toFixed(2);
+              const currentMB = ((file.size * (progress / 100)) / (1024 * 1024)).toFixed(2);
+              if (progressDetail) progressDetail.textContent = `${currentMB} MB / ${totalMB} MB`;
+            });
+
+            if (statusText) statusText.textContent = "Menyimpan ke basis data...";
+
+            const imageUrl = uploadResult.fileUrl;
+            await addGalleryPhoto({ 
+              title, 
+              description, 
+              imageUrl, 
+              uploadedBy: userSession.name, 
+              userId: userSession.uid 
+            });
+
+            Swal.close();
             toast.success("Foto berhasil dipublikasikan di galeri kelas!");
             loadAndRender();
           } catch (err: any) {
-            Swal.fire("Gagal menyimpan", err.message, "error");
+            Swal.fire({
+              title: "Gagal Mengunggah",
+              text: err.message || "Terjadi kesalahan saat mengunggah foto.",
+              icon: "error",
+              background: "#0f172a",
+              color: "#f8fafc",
+              confirmButtonColor: "#ef4444"
+            });
           }
         }
       });
